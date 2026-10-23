@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '../../.data');
 const DB_FILE = path.resolve(DATA_DIR, 'db.json');
+import { supabase } from './supabase.js';
 
 // Subscription plan definitions
 export const PLANS = {
@@ -91,10 +92,10 @@ class Store {
   }
 
   // Organizations
-  createOrg({ name, phone, subscription_tier = 'starter' }) {
+  createOrg({ id = null, name, phone, subscription_tier = 'starter' }) {
     const plan = PLANS[subscription_tier] || PLANS.starter;
     const org = {
-      id: crypto.randomUUID(),
+      id: id || crypto.randomUUID(),
       name,
       phone,
       subscription_tier: plan.id,
@@ -106,6 +107,25 @@ class Store {
     };
     this._coll('organizations').push(org);
     this.save();
+
+    // Sync to Supabase PostgreSQL table
+    if (supabase) {
+      supabase.from('organizations').insert({
+        id: org.id,
+        name: org.name,
+        phone: org.phone,
+        subscription_tier: org.subscription_tier,
+        max_bots: org.max_bots,
+        max_members: org.max_members,
+        ticket_seq: org.ticket_seq,
+        created_at: org.created_at,
+        updated_at: org.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase organizations sync note:', error.message);
+        else console.log('⚡ [Supabase] Org synchronized:', org.name);
+      }).catch(err => console.warn('Supabase org sync err:', err.message));
+    }
+
     return org;
   }
 
@@ -118,14 +138,20 @@ class Store {
     if (!org) return null;
     Object.assign(org, updates, { updated_at: new Date().toISOString() });
     this.save();
+
+    if (supabase) {
+      supabase.from('organizations').update({ ...updates, updated_at: org.updated_at }).eq('id', id)
+        .then(({ error }) => { if (error) console.warn('Supabase org update note:', error.message); })
+        .catch(err => console.warn('Supabase org update err:', err.message));
+    }
     return org;
   }
 
   // Users
-  createUser({ org_id, name, phone, password_hash, role = 'agent', permissions = null }) {
+  createUser({ id = null, org_id, name, phone, password_hash, role = 'agent', permissions = null }) {
     const perms = permissions || DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.agent;
     const user = {
-      id: crypto.randomUUID(),
+      id: id || crypto.randomUUID(),
       org_id,
       name,
       phone,
@@ -138,6 +164,25 @@ class Store {
     };
     this._coll('users').push(user);
     this.save();
+
+    if (supabase) {
+      supabase.from('users').insert({
+        id: user.id,
+        org_id: user.org_id,
+        name: user.name,
+        phone: user.phone,
+        password_hash: user.password_hash,
+        role: user.role,
+        permissions: user.permissions,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase users sync note:', error.message);
+        else console.log('⚡ [Supabase] User synchronized:', user.phone);
+      }).catch(err => console.warn('Supabase user sync err:', err.message));
+    }
+
     return user;
   }
 
@@ -158,6 +203,12 @@ class Store {
     if (!user) return null;
     Object.assign(user, updates, { updated_at: new Date().toISOString() });
     this.save();
+
+    if (supabase) {
+      supabase.from('users').update({ ...updates, updated_at: user.updated_at }).eq('id', id)
+        .then(({ error }) => { if (error) console.warn('Supabase user update note:', error.message); })
+        .catch(err => console.warn('Supabase user update err:', err.message));
+    }
     return user;
   }
 
@@ -166,15 +217,21 @@ class Store {
     if (idx !== -1) {
       this._coll('users').splice(idx, 1);
       this.save();
+
+      if (supabase) {
+        supabase.from('users').delete().eq('id', id)
+          .then(({ error }) => { if (error) console.warn('Supabase user delete note:', error.message); })
+          .catch(err => console.warn('Supabase user delete err:', err.message));
+      }
       return true;
     }
     return false;
   }
 
   // Bots
-  createBot({ org_id, bot_token, bot_username, bot_title, secret_token, webhook_url }) {
+  createBot({ id = null, org_id, bot_token, bot_username, bot_title, secret_token, webhook_url }) {
     const bot = {
-      id: crypto.randomUUID(),
+      id: id || crypto.randomUUID(),
       org_id,
       bot_token,
       bot_username,
@@ -187,6 +244,25 @@ class Store {
     };
     this._coll('bots').push(bot);
     this.save();
+
+    if (supabase) {
+      supabase.from('bots').insert({
+        id: bot.id,
+        org_id: bot.org_id,
+        bot_token: bot.bot_token,
+        bot_username: bot.bot_username,
+        bot_title: bot.bot_title,
+        secret_token: bot.secret_token,
+        webhook_url: bot.webhook_url,
+        status: bot.status,
+        created_at: bot.created_at,
+        updated_at: bot.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase bots sync note:', error.message);
+        else console.log('⚡ [Supabase] Bot synchronized:', bot.bot_username);
+      }).catch(err => console.warn('Supabase bot sync err:', err.message));
+    }
+
     return bot;
   }
 
@@ -207,6 +283,12 @@ class Store {
     if (!bot) return null;
     Object.assign(bot, updates, { updated_at: new Date().toISOString() });
     this.save();
+
+    if (supabase) {
+      supabase.from('bots').update({ ...updates, updated_at: bot.updated_at }).eq('id', id)
+        .then(({ error }) => { if (error) console.warn('Supabase bot update note:', error.message); })
+        .catch(err => console.warn('Supabase bot update err:', err.message));
+    }
     return bot;
   }
 
@@ -215,6 +297,12 @@ class Store {
     if (idx !== -1) {
       this._coll('bots').splice(idx, 1);
       this.save();
+
+      if (supabase) {
+        supabase.from('bots').delete().eq('id', id)
+          .then(({ error }) => { if (error) console.warn('Supabase bot delete note:', error.message); })
+          .catch(err => console.warn('Supabase bot delete err:', err.message));
+      }
       return true;
     }
     return false;
@@ -237,16 +325,46 @@ class Store {
       };
       this._coll('customers').push(customer);
       this.save();
+
+      if (supabase) {
+        supabase.from('customers').insert({
+          id: customer.id,
+          org_id: customer.org_id,
+          telegram_user_id: customer.telegram_user_id,
+          username: customer.username,
+          first_name: customer.first_name,
+          last_name: customer.last_name,
+          phone: customer.phone,
+          created_at: customer.created_at,
+          updated_at: customer.updated_at
+        }).then(({ error }) => {
+          if (error) console.warn('⚠️ Supabase customers sync note:', error.message);
+          else console.log('⚡ [Supabase] Customer synchronized:', customer.telegram_user_id);
+        }).catch(err => console.warn('Supabase customer sync err:', err.message));
+      }
     } else {
       // update details if changed
-      if (username || first_name || last_name) {
+      if (username || first_name || last_name || phone) {
         Object.assign(customer, {
           username: username || customer.username,
           first_name: first_name || customer.first_name,
           last_name: last_name || customer.last_name,
+          phone: phone || customer.phone,
           updated_at: new Date().toISOString()
         });
         this.save();
+
+        if (supabase) {
+          supabase.from('customers').update({
+            username: customer.username,
+            first_name: customer.first_name,
+            last_name: customer.last_name,
+            phone: customer.phone,
+            updated_at: customer.updated_at
+          }).eq('id', customer.id)
+            .then(({ error }) => { if (error) console.warn('Supabase customer update note:', error.message); })
+            .catch(err => console.warn('Supabase customer update err:', err.message));
+        }
       }
     }
     return customer;
@@ -284,6 +402,27 @@ class Store {
     };
     this._coll('complaints').push(complaint);
     this.save();
+
+    if (supabase) {
+      supabase.from('complaints').insert({
+        id: complaint.id,
+        org_id: complaint.org_id,
+        bot_id: complaint.bot_id,
+        customer_id: complaint.customer_id,
+        ticket_number: complaint.ticket_number,
+        title: complaint.title,
+        description: complaint.description,
+        category: complaint.category,
+        priority: complaint.priority,
+        status: complaint.status,
+        created_at: complaint.created_at,
+        updated_at: complaint.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase complaints sync note:', error.message);
+        else console.log('⚡ [Supabase] Complaint ticket synchronized:', complaint.ticket_number);
+      }).catch(err => console.warn('Supabase complaint sync err:', err.message));
+    }
+
     return complaint;
   }
 
@@ -324,7 +463,6 @@ class Store {
       );
     }
 
-    // Sort by updated_at descending
     return list.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   }
 
@@ -334,12 +472,19 @@ class Store {
     
     if (updates.status && (updates.status === 'closed' || updates.status === 'resolved') && !complaint.closed_at) {
       updates.closed_at = new Date().toISOString();
-    } else if (updates.status && updates.status === 'pending' || updates.status === 'in_progress') {
+    } else if (updates.status && (updates.status === 'pending' || updates.status === 'in_progress')) {
       updates.closed_at = null;
     }
 
     Object.assign(complaint, updates, { updated_at: new Date().toISOString() });
     this.save();
+
+    if (supabase) {
+      supabase.from('complaints').update({ ...updates, updated_at: complaint.updated_at }).eq('id', id)
+        .then(({ error }) => { if (error) console.warn('Supabase complaint update note:', error.message); })
+        .catch(err => console.warn('Supabase complaint update err:', err.message));
+    }
+
     return complaint;
   }
 
@@ -357,6 +502,23 @@ class Store {
     };
     this._coll('complaint_messages').push(msg);
     this.save();
+
+    if (supabase) {
+      supabase.from('complaint_messages').insert({
+        id: msg.id,
+        complaint_id: msg.complaint_id,
+        sender_type: msg.sender_type,
+        sender_id: msg.sender_id,
+        sender_name: msg.sender_name,
+        message_text: msg.message_text,
+        telegram_message_id: msg.telegram_message_id,
+        created_at: msg.created_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase complaint_messages sync note:', error.message);
+        else console.log('⚡ [Supabase] Message synchronized for complaint:', complaint_id);
+      }).catch(err => console.warn('Supabase message sync err:', err.message));
+    }
+
     return msg;
   }
 
@@ -381,6 +543,24 @@ class Store {
     };
     this._coll('invitations').push(invite);
     this.save();
+
+    if (supabase) {
+      supabase.from('invitations').insert({
+        id: invite.id,
+        org_id: invite.org_id,
+        phone: invite.phone,
+        role: invite.role,
+        permissions: invite.permissions,
+        invite_code: invite.invite_code,
+        status: invite.status,
+        created_at: invite.created_at,
+        expires_at: invite.expires_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase invitations sync note:', error.message);
+        else console.log('⚡ [Supabase] Invitation synchronized:', invite.invite_code);
+      }).catch(err => console.warn('Supabase invitation sync err:', err.message));
+    }
+
     return invite;
   }
 
@@ -397,6 +577,13 @@ class Store {
     if (!invite) return null;
     Object.assign(invite, updates);
     this.save();
+
+    if (supabase) {
+      supabase.from('invitations').update(updates).eq('id', id)
+        .then(({ error }) => { if (error) console.warn('Supabase invitation update note:', error.message); })
+        .catch(err => console.warn('Supabase invitation update err:', err.message));
+    }
+
     return invite;
   }
 }

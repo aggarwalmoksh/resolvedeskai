@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerOwner, loginUser } from '../services/authService.js';
+import { registerOwner, loginUser, sendPhoneOtp, verifyPhoneOtp } from '../services/authService.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { store } from '../db/store.js';
 
@@ -42,6 +42,40 @@ router.post('/login', async (req, res) => {
     res.json({
       status: 'success',
       message: 'Logged in successfully',
+      data: result
+    });
+  } catch (err) {
+    res.status(401).json({ status: 'error', error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/otp/send
+ * Request Phone OTP via Supabase Native Phone Auth
+ */
+router.post('/otp/send', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'phone is required' });
+    const result = await sendPhoneOtp(phone);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ status: 'error', error: err.message });
+  }
+});
+
+/**
+ * POST /api/auth/otp/verify
+ * Verify Phone OTP and log in
+ */
+router.post('/otp/verify', async (req, res) => {
+  try {
+    const { phone, token } = req.body;
+    if (!phone || !token) return res.status(400).json({ error: 'phone and token are required' });
+    const result = await verifyPhoneOtp(phone, token);
+    res.json({
+      status: 'success',
+      message: 'Phone verified and authenticated',
       data: result
     });
   } catch (err) {

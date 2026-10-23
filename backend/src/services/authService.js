@@ -47,28 +47,66 @@ export function verifyPassword(password, storedHash) {
   return crypto.timingSafeEqual(keyBuffer, derivedBuffer);
 }
 
-// Register Business Owner and create Organization
+import { supabase } from '../db/supabase.js';
+
+// Format phone number to E.164 standard for Supabase Phone Auth
+export function formatE164Phone(phone) {
+  if (!phone) return phone;
+  const digits = phone.replace(/[^0-9+]/g, '');
+  if (digits.startsWith('+')) return digits;
+  // If 10 digits (e.g. 9876543210), prepend default country code (+91 or +1)
+  if (digits.length === 10) return `+91${digits}`;
+  return `+${digits}`;
+}
+
+// Register Business Owner and create Organization (Supabase Auth Option A)
 export async function registerOwner({ name, phone, password, businessName, subscriptionTier = 'starter' }) {
   if (!phone || !name || !businessName) {
     throw new Error('Name, phone, and business name are required');
   }
 
-  const cleanPhone = phone.trim();
-  const existingUser = store.getUserByPhone(cleanPhone);
+  const cleanPhone = formatE164Phone(phone.trim());
+  const existingUser = store.getUserByPhone(cleanPhone) || store.getUserByPhone(phone.trim());
   if (existingUser) {
     throw new Error('A user with this phone number already exists');
   }
 
-  // 1. Create Organization with specified subscription tier
+  // 1. Create User in Supabase Auth (auth.users)
+  let supabaseAuthUserId = null;
+  if (supabase) {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        phone: cleanPhone,
+        password: password || undefined,
+        phone_confirm: true,
+        user_metadata: {
+          name: name.trim(),
+          business_name: businessName
+        }
+      });
+
+      if (authError) {
+        console.warn('⚠️ Supabase Auth createUser notice:', authError.message);
+      } else if (authData && authData.user) {
+        supabaseAuthUserId = authData.user.id;
+        console.log('⚡ [Supabase Auth] Created auth.user:', supabaseAuthUserId);
+      }
+    } catch (err) {
+      console.warn('Supabase Auth error:', err.message);
+    }
+  }
+
+  // 2. Create Organization with specified subscription tier
   const org = store.createOrg({
     name: businessName,
     phone: cleanPhone,
     subscription_tier: subscriptionTier
   });
 
-  // 2. Create Owner User
+  // 3. Create Owner User (linked by Supabase UUID if available)
   const passwordHash = password ? hashPassword(password) : null;
   const user = store.createUser({
+    id: supabaseAuthUserId,
     org_id: org.id,
     name: name.trim(),
     phone: cleanPhone,
@@ -86,12 +124,32 @@ export async function registerOwner({ name, phone, password, businessName, subsc
   };
 }
 
-// Login User
+// Login User via Phone and Password (with Supabase Auth Option A support)
 export async function loginUser({ phone, password }) {
   if (!phone) throw new Error('Phone number is required');
 
-  const cleanPhone = phone.trim();
-  const user = store.getUserByPhone(cleanPhone);
+  const cleanPhone = formatE164Phone(phone.trim());
+  let user = store.getUserByPhone(cleanPhone) || store.getUserByPhone(phone.trim());
+
+  // Attempt Supabase Native Phone Auth if available
+  if (supabase && password) {
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+        phone: cleanPhone,
+        password: password
+      });
+
+      if (!authErr && authData?.user) {
+        console.log('⚡ [Supabase Auth] Verified login for:', cleanPhone);
+        if (!user) {
+          user = store.getUserById(authData.user.id);
+        }
+      }
+    } catch (err) {
+      // Fall through to store authentication
+    }
+  }
+
   if (!user) throw new Error('User not found with this phone number');
 
   if (user.password_hash) {
@@ -109,6 +167,52 @@ export async function loginUser({ phone, password }) {
     user: sanitizeUser(user),
     org,
     token
+  };
+}
+
+// Supabase Native OTP Flow (Send Phone OTP via Supabase Auth)
+export async function sendPhoneOtp(phone) {
+  const cleanPhone = formatE164Phone(phone.trim());
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  const { data, error } = await supabase.auth.signInWithOtp({
+    phone: cleanPhone
+  });
+
+  if (error) throw new Error(`Supabase OTP error: ${error.message}`);
+  return { status: 'success', message: `OTP sent to ${cleanPhone}`, data };
+}
+
+// Supabase Native OTP Flow (Verify Phone OTP)
+export async function verifyPhoneOtp(phone, token) {
+  const cleanPhone = formatE164Phone(phone.trim());
+  if (!supabase) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: cleanPhone,
+    token,
+    type: 'sms'
+  });
+
+  if (error) throw new Error(`OTP verification failed: ${error.message}`);
+
+  let user = store.getUserByPhone(cleanPhone) || (data.user ? store.getUserById(data.user.id) : null);
+  if (!user) {
+    throw new Error('No business registered for this phone number. Please register first.');
+  }
+
+  const org = store.getOrgById(user.org_id);
+  const sessionToken = signToken({ userId: user.id, orgId: org.id });
+
+  return {
+    user: sanitizeUser(user),
+    org,
+    token: sessionToken,
+    supabaseSession: data.session
   };
 }
 
