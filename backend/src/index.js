@@ -1,92 +1,85 @@
 import express from 'express';
-import { PORT, BOT_TOKEN, SECRET_TOKEN, ECHO, ENFORCE_SECRET_TOKEN } from './config.js';
+import { PORT, ECHO, ENFORCE_SECRET_TOKEN } from './config.js';
+import { store } from './db/store.js';
 
-// Safety check for bot token
-if (!BOT_TOKEN) {
-  console.error('❌ CRITICAL ERROR: TELEGRAM_BOT_TOKEN is missing in the .env file!');
-  process.exit(1);
-}
+// Route imports
+import authRoutes from './routes/authRoutes.js';
+import botRoutes from './routes/botRoutes.js';
+import complaintRoutes from './routes/complaintRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 const app = express();
+
+// Body Parser
 app.use(express.json());
 
-// Send message helper using the Telegram Bot API
-export async function sendTelegramMessage(chatId, text) {
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text
-    })
-  });
-
-  const data = await response.json();
-  if (!data.ok) {
-    throw new Error(data.description || 'Failed to send message via Telegram Bot API');
+// Native CORS middleware (enables smooth frontend integration)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Telegram-Bot-Api-Secret-Token');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
   }
-  return data;
-}
+  next();
+});
 
-// Health check endpoint
+// Health check & API Discovery endpoint
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'ResolveDesk Telegram Bot API',
-    webhook: '/telegram/webhook'
+    service: 'ResolveDesk SaaS Backend API',
+    version: '2.0.0',
+    endpoints: {
+      auth: '/api/auth (register, login, me)',
+      bots: '/api/bots (list, link, unlink, sync)',
+      complaints: '/api/complaints (list, detail, status, assign, category, reply)',
+      dashboard: '/api/dashboard (stats, categories, trends)',
+      team: '/api/team (members, invite, accept-invite, permissions)',
+      subscription: '/api/subscription (plans, upgrade)',
+      telegramWebhook: '/telegram/webhook/:botId'
+    },
+    state: {
+      organizations_count: store._coll('organizations').length,
+      linked_bots_count: store._coll('bots').length,
+      complaints_count: store._coll('complaints').length
+    }
   });
 });
 
-// Telegram webhook endpoint
-app.post('/telegram/webhook', async (req, res) => {
-  const secretHeader = req.get('X-Telegram-Bot-Api-Secret-Token');
-  const cleanHeader = (secretHeader || '').trim();
-  const cleanSecret = (SECRET_TOKEN || '').trim();
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/bots', botRoutes);
+app.use('/api/complaints', complaintRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
-  // Validate secret token if configured
-  if (cleanSecret && cleanHeader !== cleanSecret) {
-    console.warn('⚠️ Webhook secret token mismatch:');
-    console.warn(`   • Expected from .env: "${cleanSecret}"`);
-    console.warn(`   • Received from Telegram header: "${cleanHeader || '(none - Telegram sent no secret header)'}"`);
+// Telegram Webhook Routes (Dynamic per bot)
+app.use('/telegram', webhookRoutes);
 
-    if (ENFORCE_SECRET_TOKEN) {
-      console.warn('   ⛔ Rejected request with 401 Unauthorized (ENFORCE_SECRET_TOKEN=1)');
-      return res.status(401).send('Unauthorized');
-    } else {
-      console.warn('   ⚠️ Allowing message through because ENFORCE_SECRET_TOKEN is not enabled.');
-      console.warn('   👉 To update Telegram with your current secret, run: npm run register-bot\n');
-    }
-  }
+// 404 handler for unmatched routes
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+});
 
-  const update = req.body;
-
-  if (update && update.message) {
-    const message = update.message;
-    const chatId = message.chat?.id;
-    const text = message.text;
-    const sender = message.from?.username || message.from?.first_name || 'User';
-
-    console.log(`📩 Received message from ${sender} (${chatId}): ${text ?? '[Non-text message]'}`);
-
-    // If ECHO is enabled in .env, reply back to user
-    if (ECHO && chatId && text) {
-      try {
-        await sendTelegramMessage(chatId, `Received: ${text}`);
-        console.log(`📤 Echo replied to chat ${chatId}`);
-      } catch (err) {
-        console.error(`❌ Failed to send echo reply to ${chatId}:`, err.message);
-      }
-    }
-  }
-
-  // Always return 200 OK promptly so Telegram knows update was received
-  return res.sendStatus(200);
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+  res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📡 Webhook endpoint: http://localhost:${PORT}/telegram/webhook`);
-  console.log(`🔁 Echo mode: ${ECHO ? 'ENABLED' : 'DISABLED'}`);
-  console.log(`🔒 Secret token verification: ${SECRET_TOKEN ? (ENFORCE_SECRET_TOKEN ? 'STRICT (401 on mismatch)' : 'PERMISSIVE (warn on mismatch)') : 'DISABLED'}`);
+  console.log(`\n=============================================================`);
+  console.log(`🚀 ResolveDesk SaaS Backend running on port ${PORT}`);
+  console.log(`📊 Health Check & Discovery: http://localhost:${PORT}/`);
+  console.log(`🤖 Dynamic Bot Webhooks: http://localhost:${PORT}/telegram/webhook/:botId`);
+  console.log(`🔒 Secret token verification: ${ENFORCE_SECRET_TOKEN ? 'STRICT (401 on mismatch)' : 'PERMISSIVE (warn on mismatch)'}`);
+  console.log(`💾 Local store loaded from: ${store.isLoaded ? '.data/db.json' : 'in-memory'}`);
+  console.log(`=============================================================\n`);
 });
+
+export default app;

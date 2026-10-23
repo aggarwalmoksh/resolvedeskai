@@ -1,18 +1,25 @@
 {
   "name": "backend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "",
+  "description": "ResolveDesk SaaS Multi-Tenant Telegram Complaint Management Backend",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "test": "node test-saas-flow.js",
     "register-bot": "node src/set-webhook.js",
     "set-webhook": "node src/set-webhook.js",
     "get-webhook": "node src/get-webhook.js",
     "delete-webhook": "node src/delete-webhook.js"
   },
-  "keywords": [],
+  "keywords": [
+    "saas",
+    "telegram",
+    "complaint-management",
+    "ticketing",
+    "multi-tenant"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

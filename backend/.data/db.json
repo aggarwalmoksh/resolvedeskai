@@ -1,0 +1,208 @@
+{
+  "organizations": [
+    {
+      "id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "name": "Lila's Blossom Boutique",
+      "phone": "9876543210",
+      "subscription_tier": "growth",
+      "max_bots": 3,
+      "max_members": 10,
+      "ticket_seq": 1002,
+      "created_at": "2026-10-23T19:35:56.099Z",
+      "updated_at": "2026-10-23T19:35:56.167Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "552c6c0d-155d-403d-af42-cb4340d4f4c3",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "name": "Lila Vance",
+      "phone": "9876543210",
+      "password_hash": "0e63dfe6693e194fe69fd4336e35244b:1e63fbe6484212e6e356cee15e003205a3675a4fbbaf5e3028c36435b85a46ff0f80b9659e79654672fd7c4f35d88a399086fb687cf7e8aec9fe99c61aa66595",
+      "role": "owner",
+      "permissions": {
+        "can_reply": true,
+        "can_update_status": true,
+        "can_assign": true,
+        "can_manage_team": true,
+        "can_manage_bots": true
+      },
+      "is_active": true,
+      "created_at": "2026-10-23T19:35:56.125Z",
+      "updated_at": "2026-10-23T19:35:56.125Z"
+    },
+    {
+      "id": "785555a9-59b8-4300-8c0f-3025d51ad69b",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "name": "Maya Patel",
+      "phone": "9876543211",
+      "password_hash": "ed0325fb49a5bef380fed44fbfb3750a:f50744d937a23d05cb45379417d45ff43d332f081e87fcc4a9e5d21ce5b72e301b603a0fad325c14d9f348aefdb07d48d0b570f439eb0ca13b680a1bb1e7273e",
+      "role": "agent",
+      "permissions": {
+        "can_reply": true,
+        "can_update_status": true,
+        "can_assign": false,
+        "can_manage_team": false,
+        "can_manage_bots": false
+      },
+      "is_active": true,
+      "created_at": "2026-10-23T19:35:56.193Z",
+      "updated_at": "2026-10-23T19:35:56.193Z"
+    }
+  ],
+  "bots": [
+    {
+      "id": "ccfd2623-c55e-489e-9b37-62552a2a770d",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "bot_token": "test_token_flower_bot_1",
+      "bot_username": "test_demo_bot",
+      "bot_title": "Flower Shop Complaint Bot",
+      "secret_token": "9f7798fbe60de1943d8dee30acac15000bccfc5a841bedac",
+      "webhook_url": "https://stoop-banister-faceless.ngrok-free.dev/telegram/webhook/ccfd2623-c55e-489e-9b37-62552a2a770d",
+      "status": "active",
+      "created_at": "2026-10-23T19:35:56.166Z",
+      "updated_at": "2026-10-23T19:35:56.166Z"
+    },
+    {
+      "id": "a2766999-947a-4543-9368-0317277b738e",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "bot_token": "test_token_flower_bot_2",
+      "bot_username": "test_demo_bot",
+      "bot_title": "Delivery Support Bot",
+      "secret_token": "bd3e605f9cd787af5e3d650686a7d8bc2315258c8d52f5e2",
+      "webhook_url": "https://stoop-banister-faceless.ngrok-free.dev/telegram/webhook/a2766999-947a-4543-9368-0317277b738e",
+      "status": "active",
+      "created_at": "2026-10-23T19:35:56.169Z",
+      "updated_at": "2026-10-23T19:35:56.169Z"
+    }
+  ],
+  "customers": [
+    {
+      "id": "f5ca3736-f207-42fd-a113-a649c3fc4cce",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "telegram_user_id": 88776655,
+      "username": "david_m",
+      "first_name": "David",
+      "last_name": "Miller",
+      "phone": null,
+      "created_at": "2026-10-23T19:35:56.194Z",
+      "updated_at": "2026-10-23T19:35:56.194Z"
+    },
+    {
+      "id": "bd8e3222-8b3e-4c4b-bbb2-0df2f6cb51d5",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "telegram_user_id": 1301821516,
+      "username": "mokshaggarwal",
+      "first_name": "Moksh",
+      "last_name": "Aggarwal",
+      "phone": null,
+      "created_at": "2026-10-23T19:56:23.951Z",
+      "updated_at": "2026-10-23T19:56:23.952Z"
+    }
+  ],
+  "complaints": [
+    {
+      "id": "c716e4cb-dd71-4a6e-861f-0dabafefbec2",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "bot_id": "ccfd2623-c55e-489e-9b37-62552a2a770d",
+      "customer_id": "f5ca3736-f207-42fd-a113-a649c3fc4cce",
+      "ticket_number": "#TICK-1001",
+      "title": "My anniversary flower bouquet was delivered dam...",
+      "description": "My anniversary flower bouquet was delivered damaged and wilting! Please help.",
+      "category": "product",
+      "priority": "medium",
+      "status": "closed",
+      "assigned_to": "785555a9-59b8-4300-8c0f-3025d51ad69b",
+      "closed_at": "2026-10-23T19:35:56.199Z",
+      "created_at": "2026-10-23T19:35:56.195Z",
+      "updated_at": "2026-10-23T19:35:56.199Z"
+    },
+    {
+      "id": "5a1aefd3-ed21-49ff-8d47-0467c629c27b",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "bot_id": "ccfd2623-c55e-489e-9b37-62552a2a770d",
+      "customer_id": "bd8e3222-8b3e-4c4b-bbb2-0df2f6cb51d5",
+      "ticket_number": "#TICK-1002",
+      "title": "Yo",
+      "description": "Yo",
+      "category": "other",
+      "priority": "medium",
+      "status": "pending",
+      "assigned_to": null,
+      "closed_at": null,
+      "created_at": "2026-10-23T19:56:23.953Z",
+      "updated_at": "2026-10-23T19:56:23.953Z"
+    }
+  ],
+  "complaint_messages": [
+    {
+      "id": "23cd0e83-579f-4952-b3af-546dfa4abf57",
+      "complaint_id": "c716e4cb-dd71-4a6e-861f-0dabafefbec2",
+      "sender_type": "customer",
+      "sender_id": "f5ca3736-f207-42fd-a113-a649c3fc4cce",
+      "sender_name": "David Miller",
+      "message_text": "My anniversary flower bouquet was delivered damaged and wilting! Please help.",
+      "telegram_message_id": 501,
+      "created_at": "2026-10-23T19:35:56.195Z"
+    },
+    {
+      "id": "a01281cf-cb0d-472d-85fa-d8f8b62fe36e",
+      "complaint_id": "c716e4cb-dd71-4a6e-861f-0dabafefbec2",
+      "sender_type": "system",
+      "sender_id": "552c6c0d-155d-403d-af42-cb4340d4f4c3",
+      "sender_name": "System",
+      "message_text": "Ticket assigned to Maya Patel by Lila Vance.",
+      "telegram_message_id": null,
+      "created_at": "2026-10-23T19:35:56.197Z"
+    },
+    {
+      "id": "b14c6c9b-adae-4d4d-9148-cce08a3df35b",
+      "complaint_id": "c716e4cb-dd71-4a6e-861f-0dabafefbec2",
+      "sender_type": "agent",
+      "sender_id": "785555a9-59b8-4300-8c0f-3025d51ad69b",
+      "sender_name": "Maya Patel",
+      "message_text": "Hello David, we sincerely apologize for the condition of your bouquet. We have dispatched a fresh luxury bouquet for immediate delivery today.",
+      "telegram_message_id": null,
+      "created_at": "2026-10-23T19:35:56.198Z"
+    },
+    {
+      "id": "215177a3-d5e2-496e-9d77-222b64870797",
+      "complaint_id": "c716e4cb-dd71-4a6e-861f-0dabafefbec2",
+      "sender_type": "system",
+      "sender_id": "785555a9-59b8-4300-8c0f-3025d51ad69b",
+      "sender_name": "System",
+      "message_text": "Status changed to 'closed' by Maya Patel.",
+      "telegram_message_id": null,
+      "created_at": "2026-10-23T19:35:56.199Z"
+    },
+    {
+      "id": "cdf4aab6-8e44-49af-8340-72d2d3c5ea69",
+      "complaint_id": "5a1aefd3-ed21-49ff-8d47-0467c629c27b",
+      "sender_type": "customer",
+      "sender_id": "bd8e3222-8b3e-4c4b-bbb2-0df2f6cb51d5",
+      "sender_name": "Moksh Aggarwal",
+      "message_text": "Yo",
+      "telegram_message_id": 19,
+      "created_at": "2026-10-23T19:56:23.954Z"
+    }
+  ],
+  "invitations": [
+    {
+      "id": "8a0266a2-f895-423c-b65d-c8dcda0a4873",
+      "org_id": "a4203875-d67c-40e9-8420-086bb049b720",
+      "phone": "9876543211",
+      "role": "agent",
+      "permissions": {
+        "can_reply": true,
+        "can_update_status": true,
+        "can_assign": false,
+        "can_manage_team": false,
+        "can_manage_bots": false
+      },
+      "invite_code": "INV-AEC45F31",
+      "status": "accepted",
+      "created_at": "2026-10-23T19:35:56.170Z",
+      "expires_at": "2026-10-30T19:35:56.170Z"
+    }
+  ]
+}
