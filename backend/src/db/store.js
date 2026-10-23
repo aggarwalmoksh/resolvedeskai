@@ -274,6 +274,76 @@ class Store {
     return this._coll('bots').find(b => b.bot_token === token) || null;
   }
 
+  async ensurePrimaryBot(botToken, secretToken = '', publicBaseUrl = '') {
+    if (!botToken) return null;
+    let bot = this._coll('bots').find(b => b.bot_token === botToken);
+    let org = this._coll('organizations')[0];
+
+    if (!org) {
+      org = this.createOrg({
+        name: 'ResolveDesk Primary Support',
+        phone: '+1000000000',
+        subscription_tier: 'scale'
+      });
+    } else if (supabase) {
+      supabase.from('organizations').upsert({
+        id: org.id,
+        name: org.name,
+        phone: org.phone,
+        subscription_tier: org.subscription_tier,
+        max_bots: org.max_bots,
+        max_members: org.max_members,
+        ticket_seq: org.ticket_seq,
+        created_at: org.created_at,
+        updated_at: org.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase org sync note:', error.message);
+        else console.log('⚡ [Supabase] Organization synchronized:', org.name);
+      }).catch(err => console.warn('Supabase org sync err:', err.message));
+    }
+
+    if (!bot) {
+      let botUsername = 'TestBusiness001bot';
+      let botTitle = 'Primary Telegram Bot';
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+        const data = await res.json();
+        if (data.ok && data.result) {
+          botUsername = data.result.username || botUsername;
+          botTitle = data.result.first_name || botTitle;
+        }
+      } catch (e) {}
+
+      bot = this.createBot({
+        org_id: org.id,
+        bot_token: botToken,
+        bot_username: botUsername,
+        bot_title: botTitle,
+        secret_token: secretToken || '',
+        webhook_url: publicBaseUrl ? `${publicBaseUrl.replace(/\/+$/, '')}/telegram/webhook` : ''
+      });
+      console.log(`🤖 [Bot Registry] Initialized primary bot @${bot.bot_username} linked to org: ${org.name}`);
+    } else if (supabase) {
+      supabase.from('bots').upsert({
+        id: bot.id,
+        org_id: bot.org_id,
+        bot_token: bot.bot_token,
+        bot_username: bot.bot_username,
+        bot_title: bot.bot_title,
+        secret_token: bot.secret_token,
+        webhook_url: bot.webhook_url,
+        status: bot.status,
+        created_at: bot.created_at,
+        updated_at: bot.updated_at
+      }).then(({ error }) => {
+        if (error) console.warn('⚠️ Supabase bot sync note:', error.message);
+        else console.log('⚡ [Supabase] Bot synchronized:', bot.bot_username);
+      }).catch(err => console.warn('Supabase bot sync err:', err.message));
+    }
+
+    return bot;
+  }
+
   getBotsByOrg(orgId) {
     return this._coll('bots').filter(b => b.org_id === orgId);
   }
@@ -309,7 +379,7 @@ class Store {
   }
 
   // Customers
-  getOrCreateCustomer({ org_id, telegram_user_id, username, first_name, last_name, phone }) {
+  async getOrCreateCustomer({ org_id, telegram_user_id, username, first_name, last_name, phone }) {
     let customer = this._coll('customers').find(c => c.org_id === org_id && String(c.telegram_user_id) === String(telegram_user_id));
     if (!customer) {
       customer = {
@@ -327,23 +397,25 @@ class Store {
       this.save();
 
       if (supabase) {
-        supabase.from('customers').insert({
-          id: customer.id,
-          org_id: customer.org_id,
-          telegram_user_id: customer.telegram_user_id,
-          username: customer.username,
-          first_name: customer.first_name,
-          last_name: customer.last_name,
-          phone: customer.phone,
-          created_at: customer.created_at,
-          updated_at: customer.updated_at
-        }).then(({ error }) => {
-          if (error) console.warn('⚠️ Supabase customers sync note:', error.message);
+        try {
+          const { error } = await supabase.from('customers').upsert({
+            id: customer.id,
+            org_id: customer.org_id,
+            telegram_user_id: customer.telegram_user_id,
+            username: customer.username,
+            first_name: customer.first_name,
+            last_name: customer.last_name,
+            phone: customer.phone,
+            created_at: customer.created_at,
+            updated_at: customer.updated_at
+          });
+          if (error) console.warn('⚠️ Supabase customer sync note:', error.message);
           else console.log('⚡ [Supabase] Customer synchronized:', customer.telegram_user_id);
-        }).catch(err => console.warn('Supabase customer sync err:', err.message));
+        } catch (err) {
+          console.warn('Supabase customer sync err:', err.message);
+        }
       }
     } else {
-      // update details if changed
       if (username || first_name || last_name || phone) {
         Object.assign(customer, {
           username: username || customer.username,
@@ -355,15 +427,18 @@ class Store {
         this.save();
 
         if (supabase) {
-          supabase.from('customers').update({
-            username: customer.username,
-            first_name: customer.first_name,
-            last_name: customer.last_name,
-            phone: customer.phone,
-            updated_at: customer.updated_at
-          }).eq('id', customer.id)
-            .then(({ error }) => { if (error) console.warn('Supabase customer update note:', error.message); })
-            .catch(err => console.warn('Supabase customer update err:', err.message));
+          try {
+            const { error } = await supabase.from('customers').update({
+              username: customer.username,
+              first_name: customer.first_name,
+              last_name: customer.last_name,
+              phone: customer.phone,
+              updated_at: customer.updated_at
+            }).eq('id', customer.id);
+            if (error) console.warn('Supabase customer update note:', error.message);
+          } catch (err) {
+            console.warn('Supabase customer update err:', err.message);
+          }
         }
       }
     }
@@ -382,7 +457,7 @@ class Store {
     return `#TICK-${seq}`;
   }
 
-  createComplaint({ org_id, bot_id, customer_id, title, description, category = 'other', priority = 'medium' }) {
+  async createComplaint({ org_id, bot_id, customer_id, title, description, category = 'other', priority = 'medium' }) {
     const ticketNumber = this.getNextTicketNumber(org_id);
     const complaint = {
       id: crypto.randomUUID(),
@@ -394,7 +469,7 @@ class Store {
       description,
       category,
       priority,
-      status: 'pending', // pending, in_progress, resolved, closed
+      status: 'pending',
       assigned_to: null,
       closed_at: null,
       created_at: new Date().toISOString(),
@@ -404,23 +479,26 @@ class Store {
     this.save();
 
     if (supabase) {
-      supabase.from('complaints').insert({
-        id: complaint.id,
-        org_id: complaint.org_id,
-        bot_id: complaint.bot_id,
-        customer_id: complaint.customer_id,
-        ticket_number: complaint.ticket_number,
-        title: complaint.title,
-        description: complaint.description,
-        category: complaint.category,
-        priority: complaint.priority,
-        status: complaint.status,
-        created_at: complaint.created_at,
-        updated_at: complaint.updated_at
-      }).then(({ error }) => {
-        if (error) console.warn('⚠️ Supabase complaints sync note:', error.message);
+      try {
+        const { error } = await supabase.from('complaints').insert({
+          id: complaint.id,
+          org_id: complaint.org_id,
+          bot_id: complaint.bot_id,
+          customer_id: complaint.customer_id,
+          ticket_number: complaint.ticket_number,
+          title: complaint.title,
+          description: complaint.description,
+          category: complaint.category,
+          priority: complaint.priority,
+          status: complaint.status,
+          created_at: complaint.created_at,
+          updated_at: complaint.updated_at
+        });
+        if (error) console.warn('⚠️ Supabase complaint sync note:', error.message);
         else console.log('⚡ [Supabase] Complaint ticket synchronized:', complaint.ticket_number);
-      }).catch(err => console.warn('Supabase complaint sync err:', err.message));
+      } catch (err) {
+        console.warn('Supabase complaint sync err:', err.message);
+      }
     }
 
     return complaint;
@@ -466,7 +544,7 @@ class Store {
     return list.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   }
 
-  updateComplaint(id, updates, orgId = null) {
+  async updateComplaint(id, updates, orgId = null) {
     const complaint = this.getComplaintById(id, orgId);
     if (!complaint) return null;
     
@@ -480,20 +558,23 @@ class Store {
     this.save();
 
     if (supabase) {
-      supabase.from('complaints').update({ ...updates, updated_at: complaint.updated_at }).eq('id', id)
-        .then(({ error }) => { if (error) console.warn('Supabase complaint update note:', error.message); })
-        .catch(err => console.warn('Supabase complaint update err:', err.message));
+      try {
+        const { error } = await supabase.from('complaints').update({ ...updates, updated_at: complaint.updated_at }).eq('id', id);
+        if (error) console.warn('Supabase complaint update note:', error.message);
+      } catch (err) {
+        console.warn('Supabase complaint update err:', err.message);
+      }
     }
 
     return complaint;
   }
 
   // Complaint Messages
-  addMessage({ complaint_id, sender_type, sender_id, sender_name, message_text, telegram_message_id = null }) {
+  async addMessage({ complaint_id, sender_type, sender_id, sender_name, message_text, telegram_message_id = null }) {
     const msg = {
       id: crypto.randomUUID(),
       complaint_id,
-      sender_type, // 'customer', 'agent', 'system'
+      sender_type,
       sender_id: String(sender_id),
       sender_name: sender_name || null,
       message_text,
@@ -504,19 +585,22 @@ class Store {
     this.save();
 
     if (supabase) {
-      supabase.from('complaint_messages').insert({
-        id: msg.id,
-        complaint_id: msg.complaint_id,
-        sender_type: msg.sender_type,
-        sender_id: msg.sender_id,
-        sender_name: msg.sender_name,
-        message_text: msg.message_text,
-        telegram_message_id: msg.telegram_message_id,
-        created_at: msg.created_at
-      }).then(({ error }) => {
+      try {
+        const { error } = await supabase.from('complaint_messages').insert({
+          id: msg.id,
+          complaint_id: msg.complaint_id,
+          sender_type: msg.sender_type,
+          sender_id: msg.sender_id,
+          sender_name: msg.sender_name,
+          message_text: msg.message_text,
+          telegram_message_id: msg.telegram_message_id,
+          created_at: msg.created_at
+        });
         if (error) console.warn('⚠️ Supabase complaint_messages sync note:', error.message);
         else console.log('⚡ [Supabase] Message synchronized for complaint:', complaint_id);
-      }).catch(err => console.warn('Supabase message sync err:', err.message));
+      } catch (err) {
+        console.warn('Supabase message sync err:', err.message);
+      }
     }
 
     return msg;

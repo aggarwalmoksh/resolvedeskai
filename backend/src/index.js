@@ -1,5 +1,5 @@
 import express from 'express';
-import { PORT, ECHO, ENFORCE_SECRET_TOKEN } from './config.js';
+import { PORT, ECHO, ENFORCE_SECRET_TOKEN, BOT_TOKEN, SECRET_TOKEN, PUBLIC_BASE_URL, SUPABASE_URL } from './config.js';
 import { store } from './db/store.js';
 
 // Route imports
@@ -40,7 +40,7 @@ app.get('/', (req, res) => {
       dashboard: '/api/dashboard (stats, categories, trends)',
       team: '/api/team (members, invite, accept-invite, permissions)',
       subscription: '/api/subscription (plans, upgrade)',
-      telegramWebhook: '/telegram/webhook/:botId'
+      telegramWebhook: '/telegram/webhook'
     },
     state: {
       organizations_count: store._coll('organizations').length,
@@ -58,7 +58,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/subscription', subscriptionRoutes);
 
-// Telegram Webhook Routes (Dynamic per bot)
+// Telegram Webhook Routes (Dynamic per bot and legacy default)
 app.use('/telegram', webhookRoutes);
 
 // 404 handler for unmatched routes
@@ -72,14 +72,27 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n=============================================================`);
   console.log(`🚀 ResolveDesk SaaS Backend running on port ${PORT}`);
   console.log(`📊 Health Check & Discovery: http://localhost:${PORT}/`);
-  console.log(`🤖 Dynamic Bot Webhooks: http://localhost:${PORT}/telegram/webhook/:botId`);
-  console.log(`🔒 Secret token verification: ${ENFORCE_SECRET_TOKEN ? 'STRICT (401 on mismatch)' : 'PERMISSIVE (warn on mismatch)'}`);
-  console.log(`💾 Local store loaded from: ${store.isLoaded ? '.data/db.json' : 'in-memory'}`);
-  console.log(`=============================================================\n`);
+  console.log(`🤖 Telegram Webhook Endpoint: http://localhost:${PORT}/telegram/webhook`);
+  if (PUBLIC_BASE_URL) {
+    console.log(`🌐 Public Webhook URL     : ${PUBLIC_BASE_URL.replace(/\/+$/, '')}/telegram/webhook`);
+  }
+  console.log(`⚡ Supabase Database       : ${SUPABASE_URL ? 'CONNECTED (' + SUPABASE_URL + ')' : 'NOT CONFIGURED'}`);
+  console.log(`🔒 Secret Token Verify    : ${ENFORCE_SECRET_TOKEN ? 'STRICT (401 on mismatch)' : 'PERMISSIVE'}`);
+  console.log(`💾 Local Store Loaded From : ${store.isLoaded ? '.data/db.json' : 'in-memory'}`);
+  console.log(`=============================================================`);
+
+  if (BOT_TOKEN) {
+    try {
+      await store.ensurePrimaryBot(BOT_TOKEN, SECRET_TOKEN, PUBLIC_BASE_URL);
+    } catch (err) {
+      console.warn('⚠️ Notice during primary bot setup:', err.message);
+    }
+  }
+  console.log(`\nReady to receive Telegram messages!\n`);
 });
 
 export default app;

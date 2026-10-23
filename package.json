@@ -1,4 +1,14 @@
 {
+  "name": "resolvedesk",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "start": "npm --prefix backend start",
+    "test": "npm --prefix backend test",
+    "set-webhook": "npm --prefix backend run set-webhook",
+    "get-webhook": "npm --prefix backend run get-webhook",
+    "delete-webhook": "npm --prefix backend run delete-webhook"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0"
   }

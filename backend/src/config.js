@@ -5,12 +5,20 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Check possible locations for .env (root workspace or backend folder)
+// Check possible locations for .env or env (root workspace or backend folder)
 const candidatePaths = [
   path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../env'),
   path.resolve(__dirname, '../.env'),
+  path.resolve(__dirname, '../env'),
   path.resolve(process.cwd(), '.env'),
-  path.resolve(process.cwd(), '../.env')
+  path.resolve(process.cwd(), 'env'),
+  path.resolve(process.cwd(), '../.env'),
+  path.resolve(process.cwd(), '../env'),
+  path.resolve(process.cwd(), 'resolvedesk/.env'),
+  path.resolve(process.cwd(), 'resolvedesk/env'),
+  path.resolve(process.cwd(), 'resolvedesk/backend/.env'),
+  path.resolve(process.cwd(), 'resolvedesk/backend/env')
 ];
 
 const envPath = candidatePaths.find(p => fs.existsSync(p));

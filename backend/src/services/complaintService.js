@@ -48,7 +48,7 @@ export async function ingestTelegramMessage(bot, telegramMessage) {
   const messageId = telegramMessage.message_id;
 
   // 1. Upsert Customer Record
-  const customer = store.getOrCreateCustomer({
+  const customer = await store.getOrCreateCustomer({
     org_id: bot.org_id,
     telegram_user_id: from.id,
     username: from.username,
@@ -66,7 +66,7 @@ export async function ingestTelegramMessage(bot, telegramMessage) {
     const category = detectCategory(text);
     const titleSnippet = text.length > 50 ? `${text.substring(0, 47)}...` : text;
 
-    complaint = store.createComplaint({
+    complaint = await store.createComplaint({
       org_id: bot.org_id,
       bot_id: bot.id,
       customer_id: customer.id,
@@ -76,14 +76,14 @@ export async function ingestTelegramMessage(bot, telegramMessage) {
       priority: 'medium'
     });
   } else {
-    store.updateComplaint(complaint.id, {
+    await store.updateComplaint(complaint.id, {
       description: `${complaint.description}\n---\n[Update]: ${text}`
     }, bot.org_id);
   }
 
   // 3. Append to Conversation Thread
   const senderDisplayName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || customer.username || 'Customer';
-  store.addMessage({
+  await store.addMessage({
     complaint_id: complaint.id,
     sender_type: 'customer',
     sender_id: customer.id,
@@ -97,6 +97,7 @@ export async function ingestTelegramMessage(bot, telegramMessage) {
     try {
       const ackText = `🌸 Hello! We have received your complaint [${complaint.ticket_number}].\nOur team is reviewing it and will respond here shortly.`;
       await sendTelegramReply(bot.bot_token, customer.telegram_user_id, ackText, messageId);
+      console.log(`📤 [Telegram Reply] Sent auto-acknowledgment for ticket [${complaint.ticket_number}] to user ${customer.telegram_user_id}`);
     } catch (err) {
       console.warn('⚠️ Could not send automated acknowledgment to customer:', err.message);
     }
@@ -119,7 +120,7 @@ export async function replyToComplaint({ complaintId, orgId, user, messageText }
   if (!bot) throw new Error('Originating Telegram bot not found');
 
   // Record staff message in conversation thread
-  const msg = store.addMessage({
+  const msg = await store.addMessage({
     complaint_id: complaint.id,
     sender_type: 'agent',
     sender_id: user.id,
@@ -129,7 +130,7 @@ export async function replyToComplaint({ complaintId, orgId, user, messageText }
 
   // If status was pending, advance to in_progress
   if (complaint.status === 'pending') {
-    store.updateComplaint(complaint.id, { status: 'in_progress' }, orgId);
+    await store.updateComplaint(complaint.id, { status: 'in_progress' }, orgId);
   }
 
   // Send reply directly to customer on Telegram

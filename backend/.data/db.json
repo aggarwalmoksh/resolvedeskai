@@ -7,7 +7,7 @@
       "subscription_tier": "growth",
       "max_bots": 3,
       "max_members": 10,
-      "ticket_seq": 1001,
+      "ticket_seq": 1004,
       "created_at": "2026-10-23T20:59:31.169Z",
       "updated_at": "2026-10-23T20:59:32.918Z"
     }
@@ -74,6 +74,18 @@
       "status": "active",
       "created_at": "2026-10-23T20:59:33.377Z",
       "updated_at": "2026-10-23T20:59:33.377Z"
+    },
+    {
+      "id": "782582ea-403f-40fd-a6c6-a4e6db218469",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "bot_token": "8866904329:AAFJpSnWEDYZmvYcnO5HnaxflbkzhjMYGlY",
+      "bot_username": "TestBusiness001bot",
+      "bot_title": "TestBusiness001",
+      "secret_token": "xjDAujvmJqNBEBXafLFcWOVBT4pXkClykhW3IOjKqvM",
+      "webhook_url": "https://stoop-banister-faceless.ngrok-free.dev/telegram/webhook",
+      "status": "active",
+      "created_at": "2026-10-23T21:44:23.144Z",
+      "updated_at": "2026-10-23T21:44:23.147Z"
     }
   ],
   "customers": [
@@ -87,6 +99,39 @@
       "phone": null,
       "created_at": "2026-10-23T20:59:33.452Z",
       "updated_at": "2026-10-23T20:59:33.452Z"
+    },
+    {
+      "id": "f0834f70-43e0-4a87-85d3-11bdedcb44e0",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "telegram_user_id": 11223344,
+      "username": "test_user_telegram",
+      "first_name": "TestCustomer",
+      "last_name": null,
+      "phone": null,
+      "created_at": "2026-10-23T21:45:10.956Z",
+      "updated_at": "2026-10-23T21:45:10.957Z"
+    },
+    {
+      "id": "930b8173-0a6a-4985-94ac-739d494636f3",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "telegram_user_id": 55667788,
+      "username": "aiden_buyer",
+      "first_name": "Aiden",
+      "last_name": null,
+      "phone": null,
+      "created_at": "2026-10-23T21:46:41.357Z",
+      "updated_at": "2026-10-23T21:46:41.359Z"
+    },
+    {
+      "id": "55b12eb7-a511-4f5e-8ff5-e0299c3f1375",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "telegram_user_id": 1301821516,
+      "username": "mokshaggarwal",
+      "first_name": "Moksh",
+      "last_name": "Aggarwal",
+      "phone": null,
+      "created_at": "2026-10-23T22:00:09.735Z",
+      "updated_at": "2026-10-23T22:00:09.736Z"
     }
   ],
   "complaints": [
@@ -105,6 +150,54 @@
       "closed_at": "2026-10-23T20:59:33.939Z",
       "created_at": "2026-10-23T20:59:33.455Z",
       "updated_at": "2026-10-23T20:59:33.939Z"
+    },
+    {
+      "id": "839d98b8-039b-483f-808e-426b21c22c37",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "bot_id": "782582ea-403f-40fd-a6c6-a4e6db218469",
+      "customer_id": "f0834f70-43e0-4a87-85d3-11bdedcb44e0",
+      "ticket_number": "#TICK-1002",
+      "title": "Where is my order? The delivery is very late!",
+      "description": "Where is my order? The delivery is very late!",
+      "category": "delivery",
+      "priority": "medium",
+      "status": "pending",
+      "assigned_to": null,
+      "closed_at": null,
+      "created_at": "2026-10-23T21:45:10.962Z",
+      "updated_at": "2026-10-23T21:45:10.962Z"
+    },
+    {
+      "id": "9bae5b57-3d52-442e-9ee1-867cd31fda75",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "bot_id": "782582ea-403f-40fd-a6c6-a4e6db218469",
+      "customer_id": "930b8173-0a6a-4985-94ac-739d494636f3",
+      "ticket_number": "#TICK-1003",
+      "title": "The flowers were completely wilted on arrival, ...",
+      "description": "The flowers were completely wilted on arrival, I want a refund!",
+      "category": "product",
+      "priority": "medium",
+      "status": "pending",
+      "assigned_to": null,
+      "closed_at": null,
+      "created_at": "2026-10-23T21:46:42.639Z",
+      "updated_at": "2026-10-23T21:46:42.639Z"
+    },
+    {
+      "id": "17379391-4e71-4162-a83f-e33f3f58640a",
+      "org_id": "d74ce948-bc47-45d1-9b99-56b8c4888c13",
+      "bot_id": "782582ea-403f-40fd-a6c6-a4e6db218469",
+      "customer_id": "55b12eb7-a511-4f5e-8ff5-e0299c3f1375",
+      "ticket_number": "#TICK-1004",
+      "title": "Rishuu",
+      "description": "Rishuu",
+      "category": "other",
+      "priority": "medium",
+      "status": "pending",
+      "assigned_to": null,
+      "closed_at": null,
+      "created_at": "2026-10-23T22:00:10.746Z",
+      "updated_at": "2026-10-23T22:00:10.746Z"
     }
   ],
   "complaint_messages": [
@@ -147,6 +240,36 @@
       "message_text": "Status changed to 'closed' by Maya Patel.",
       "telegram_message_id": null,
       "created_at": "2026-10-23T20:59:33.941Z"
+    },
+    {
+      "id": "358a51fe-a441-4cbd-b0a6-88214912de78",
+      "complaint_id": "839d98b8-039b-483f-808e-426b21c22c37",
+      "sender_type": "customer",
+      "sender_id": "f0834f70-43e0-4a87-85d3-11bdedcb44e0",
+      "sender_name": "TestCustomer",
+      "message_text": "Where is my order? The delivery is very late!",
+      "telegram_message_id": 9999,
+      "created_at": "2026-10-23T21:45:10.965Z"
+    },
+    {
+      "id": "12c41fc0-7b50-45f9-b0b9-805e790ee7f7",
+      "complaint_id": "9bae5b57-3d52-442e-9ee1-867cd31fda75",
+      "sender_type": "customer",
+      "sender_id": "930b8173-0a6a-4985-94ac-739d494636f3",
+      "sender_name": "Aiden",
+      "message_text": "The flowers were completely wilted on arrival, I want a refund!",
+      "telegram_message_id": 10001,
+      "created_at": "2026-10-23T21:46:43.887Z"
+    },
+    {
+      "id": "21f56685-ecfd-4aaa-8105-b16ee30ca827",
+      "complaint_id": "17379391-4e71-4162-a83f-e33f3f58640a",
+      "sender_type": "customer",
+      "sender_id": "55b12eb7-a511-4f5e-8ff5-e0299c3f1375",
+      "sender_name": "Moksh Aggarwal",
+      "message_text": "Rishuu",
+      "telegram_message_id": 21,
+      "created_at": "2026-10-23T22:00:11.157Z"
     }
   ],
   "invitations": [
