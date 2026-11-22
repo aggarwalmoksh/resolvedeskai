@@ -24,7 +24,7 @@ export function ComplaintsView({ onSelectComplaint: selectComplaint } = {}) {
   const reduce = useReducedMotion();
   const canSeeAll = ['owner', 'admin'].includes(user?.role);
   const results = complaints.filter(item => {
-    if ((!canSeeAll || scope === 'mine') && item.assigned_to !== user?.id) return false;
+    if (scope === 'mine' && item.assigned_to !== user?.id) return false;
     if (scope === 'unassigned' && item.assigned_to) return false;
     const closed = ['resolved', 'closed'].includes(item.status);
     if (status === 'resolved' ? !closed : status !== 'all' && item.status !== status) return false;

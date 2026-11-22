@@ -61,7 +61,7 @@ router.post('/invite', requirePermission('can_manage_team'), async (req, res, ne
         ignoreExisting: true,
         expiresInDays: 7,
       });
-      await store.updateInvitation(invitation.id, { clerk_invitation_id: sent.id });
+      await store.updateInvitation(invitation.id, req.org.id, { clerk_invitation_id: sent.id });
       res.status(pending ? 200 : 201).json({ status: 'success', data: { invitation, email_sent: true } });
     } catch (error) {
       const reason = error.errors?.[0]?.longMessage || error.errors?.[0]?.message || error.message;
@@ -89,7 +89,7 @@ router.delete('/invitations/:id', requireRole(['admin']), async (req, res, next)
 
 router.patch('/members/:id/permissions', requireRole(['admin']), async (req, res, next) => {
   try {
-    const member = await store.getUserById(req.params.id);
+    const member = await store.getUserById(req.params.id, req.org.id);
     if (!member || member.org_id !== req.org.id) return res.status(404).json({ error: 'Member not found.' });
     if (!canEditMemberPermissions(req.user, member)) {
       return res.status(403).json({ error: 'You cannot edit permissions for this member.' });
@@ -104,7 +104,7 @@ router.patch('/members/:id/permissions', requireRole(['admin']), async (req, res
       return res.status(403).json({ error: 'Only the workspace owner can change roles.' });
     }
 
-    const updated = await store.updateUser(member.id, {
+    const updated = await store.updateUser(member.id, req.org.id, {
       ...(role === undefined ? {} : { role }),
       permissions: { ...member.permissions, ...changes },
     });
@@ -118,7 +118,7 @@ router.delete('/members/:id', async (req, res, next) => {
       return res.status(403).json({ error: 'Only the organization owner can remove team members.' });
     }
 
-    const member = await store.getUserById(req.params.id);
+    const member = await store.getUserById(req.params.id, req.org.id);
     if (!member || member.org_id !== req.org.id) {
       return res.status(404).json({ error: 'Member not found in your organization.' });
     }
@@ -137,7 +137,7 @@ router.delete('/members/:id', async (req, res, next) => {
     }
 
     // 2. Strictly delete from Supabase
-    await store.deleteUser(member.id);
+    await store.deleteUser(member.id, req.org.id);
 
     res.json({
       status: 'success',

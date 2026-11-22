@@ -9,6 +9,9 @@
 
 CREATE EXTENSION IF NOT EXISTS uuid-ossp;
 
+-- This file resets the schema. Apply harden_tenant_and_telegram.sql after a fresh reset.
+DROP TABLE IF EXISTS telegram_update_inbox CASCADE;
+DROP TABLE IF EXISTS workspace_revisions CASCADE;
 DROP TABLE IF EXISTS complaint_messages CASCADE;
 DROP TABLE IF EXISTS complaints CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
@@ -16,6 +19,10 @@ DROP TABLE IF EXISTS bots CASCADE;
 DROP TABLE IF EXISTS invitations CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS organizations CASCADE;
+DROP FUNCTION IF EXISTS public.process_telegram_update();
+DROP FUNCTION IF EXISTS public.bump_workspace_revision();
+DROP FUNCTION IF EXISTS public.check_ticket_collaborator_org();
+DROP FUNCTION IF EXISTS public.remove_ticket_collaborator();
 
 -- 1. Organizations
 CREATE TABLE IF NOT EXISTS organizations (
@@ -107,6 +114,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     priority VARCHAR(32) NOT NULL DEFAULT 'medium',
     status VARCHAR(32) NOT NULL DEFAULT 'pending',
     assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+    collaborator_ids UUID[] NOT NULL DEFAULT '{}',
     closed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -116,6 +124,7 @@ CREATE TABLE IF NOT EXISTS complaints (
 CREATE INDEX IF NOT EXISTS idx_complaints_org ON complaints(org_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
+CREATE INDEX IF NOT EXISTS idx_complaints_collaborators ON complaints USING gin (collaborator_ids);
 CREATE INDEX IF NOT EXISTS idx_complaints_assigned ON complaints(assigned_to);
 
 -- 6. Complaint Messages

@@ -12,7 +12,7 @@ router.use(authMiddleware);
  */
 router.get('/stats', async (req, res) => {
   const orgId = req.org.id;
-  const [complaints, bots, members] = await Promise.all([store.getComplaints(orgId, { assigned_to: complaintAssigneeScope(req.user) }), store.getBotsByOrg(orgId), store.getUsersByOrg(orgId)]);
+  const [complaints, bots, members] = await Promise.all([store.getComplaints(orgId, { participant_id: complaintAssigneeScope(req.user) }), store.getBotsByOrg(orgId), store.getUsersByOrg(orgId)]);
 
   const total = complaints.length;
   const pending = complaints.filter(c => c.status === 'pending').length;
@@ -48,7 +48,7 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   const orgId = req.org.id;
-  const complaints = await store.getComplaints(orgId, { assigned_to: complaintAssigneeScope(req.user) });
+  const complaints = await store.getComplaints(orgId, { participant_id: complaintAssigneeScope(req.user) });
   const total = complaints.length;
 
   const categories = ['product', 'delivery', 'billing', 'service', 'other'];
@@ -76,7 +76,7 @@ router.get('/categories', async (req, res) => {
  */
 router.get('/trends', async (req, res) => {
   const orgId = req.org.id;
-  const complaints = await store.getComplaints(orgId, { assigned_to: complaintAssigneeScope(req.user) });
+  const complaints = await store.getComplaints(orgId, { participant_id: complaintAssigneeScope(req.user) });
 
   // Group by day for the last 7 days
   const days = {};

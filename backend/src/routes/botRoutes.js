@@ -1,3 +1,4 @@
+import { readBotToken } from '../services/botSecrets.js';
 import express from 'express';
 import crypto from 'crypto';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -10,36 +11,28 @@ import { PUBLIC_BASE_URL } from '../config.js';
 const router = express.Router();
 router.use(authMiddleware);
 
+function publicBot({ id, bot_username, bot_title, masked_token, webhook_url, status, created_at }) {
+  return { id, bot_username, bot_title, masked_token, webhook_url, status, created_at };
+}
+
 /**
  * GET /api/bots
  * List all linked Telegram bots for the organization
  */
 router.get('/', async (req, res, next) => {
   try {
-  const bots = (await store.getBotsByOrg(req.org.id)).map(b => {
-    // Mask bot token for security
-    const maskedToken = b.bot_token.length > 10 ? `${b.bot_token.substring(0, 6)}...${b.bot_token.substring(b.bot_token.length - 4)}` : '***';
-    return {
-      id: b.id,
-      bot_username: b.bot_username,
-      bot_title: b.bot_title,
-      masked_token: maskedToken,
-      webhook_url: b.webhook_url,
-      status: b.status,
-      created_at: b.created_at
-    };
-  });
+    const bots = (await store.getBotsByOrg(req.org.id)).map(publicBot);
 
-  res.json({
-    status: 'success',
-    data: {
-      bots,
-      quota: {
-        used: bots.length,
-        max: req.org.max_bots
+    res.json({
+      status: 'success',
+      data: {
+        bots,
+        quota: {
+          used: bots.length,
+          max: req.org.max_bots
+        }
       }
-    }
-  });
+    });
   } catch (error) { next(error); }
 });
 
@@ -50,11 +43,16 @@ router.get('/', async (req, res, next) => {
 router.post('/', requirePermission('can_manage_bots'), checkBotQuota, async (req, res) => {
   try {
     const { bot_token, bot_title } = req.body;
-    if (!bot_token) {
+    if (typeof bot_token !== 'string' || !bot_token.trim()) {
       return res.status(400).json({ error: 'bot_token is required' });
     }
 
     const cleanToken = bot_token.trim();
+
+    const testToken = process.env.NODE_ENV !== 'production' && cleanToken.startsWith('test_');
+    if (!testToken && !/^\d+:[A-Za-z0-9_-]+$/.test(cleanToken)) {
+      return res.status(400).json({ error: 'Enter a valid Telegram bot token.' });
+    }
 
     // Check if token already linked to any organization
     const existing = await store.getBotByToken(cleanToken);
@@ -71,13 +69,6 @@ router.post('/', requirePermission('can_manage_bots'), checkBotQuota, async (req
     const baseUrl = (PUBLIC_BASE_URL || 'http://localhost:4000').replace(/\/+$/, '');
     const webhookUrl = `${baseUrl}/telegram/webhook/${tempBotId}`;
 
-    // 3. Register webhook with Telegram
-    try {
-      await registerBotWebhook(cleanToken, webhookUrl, secretToken);
-    } catch (err) {
-      console.warn('⚠️ Webhook registration with Telegram failed (might be offline/dev):', err.message);
-    }
-
     // 4. Save to store
     const newBot = await store.createBot({
       id: tempBotId,
@@ -89,19 +80,20 @@ router.post('/', requirePermission('can_manage_bots'), checkBotQuota, async (req
       webhook_url: webhookUrl
     });
 
+    // Reserve the token before registering so a concurrent link cannot replace the webhook.
+    try {
+      await registerBotWebhook(cleanToken, webhookUrl, secretToken);
+    } catch {
+      console.warn('Telegram webhook registration failed. Use Sync to retry.');
+    }
+
     res.status(201).json({
       status: 'success',
       message: `Bot @${newBot.bot_username} linked successfully!`,
-      data: {
-        id: newBot.id,
-        bot_username: newBot.bot_username,
-        bot_title: newBot.bot_title,
-        webhook_url: newBot.webhook_url,
-        status: newBot.status
-      }
+      data: publicBot(newBot)
     });
   } catch (err) {
-    res.status(400).json({ status: 'error', error: err.message });
+    res.status(400).json({ status: 'error', error: err.code === '23505' ? 'This Telegram bot is already linked.' : 'Could not complete the bot operation.' });
   }
 });
 
@@ -111,26 +103,26 @@ router.post('/', requirePermission('can_manage_bots'), checkBotQuota, async (req
  */
 router.delete('/:id', requirePermission('can_manage_bots'), async (req, res) => {
   try {
-    const bot = await store.getBotById(req.params.id);
+    const bot = await store.getBotById(req.params.id, req.org.id);
     if (!bot || bot.org_id !== req.org.id) {
       return res.status(404).json({ error: 'Bot not found in your organization' });
     }
 
     // Deregister webhook from Telegram
     try {
-      await deleteBotWebhook(bot.bot_token);
+      await deleteBotWebhook(readBotToken(bot));
     } catch (err) {
       console.warn('⚠️ Failed to delete webhook from Telegram:', err.message);
     }
 
-    await store.deleteBot(bot.id);
+    await store.deleteBot(bot.id, req.org.id);
 
     res.json({
       status: 'success',
       message: `Bot @${bot.bot_username} unlinked successfully`
     });
   } catch (err) {
-    res.status(400).json({ status: 'error', error: err.message });
+    res.status(400).json({ status: 'error', error: err.code === '23505' ? 'This Telegram bot is already linked.' : 'Could not complete the bot operation.' });
   }
 });
 
@@ -140,7 +132,7 @@ router.delete('/:id', requirePermission('can_manage_bots'), async (req, res) => 
  */
 router.post('/:id/sync', requirePermission('can_manage_bots'), async (req, res) => {
   try {
-    const bot = await store.getBotById(req.params.id);
+    const bot = await store.getBotById(req.params.id, req.org.id);
     if (!bot || bot.org_id !== req.org.id) {
       return res.status(404).json({ error: 'Bot not found in your organization' });
     }
@@ -148,8 +140,8 @@ router.post('/:id/sync', requirePermission('can_manage_bots'), async (req, res) 
     const baseUrl = (PUBLIC_BASE_URL || 'http://localhost:4000').replace(/\/+$/, '');
     const webhookUrl = `${baseUrl}/telegram/webhook/${bot.id}`;
 
-    await registerBotWebhook(bot.bot_token, webhookUrl, bot.secret_token);
-    await store.updateBot(bot.id, { webhook_url: webhookUrl, status: 'active' });
+    await registerBotWebhook(readBotToken(bot), webhookUrl, bot.secret_token);
+    await store.updateBot(bot.id, req.org.id, { webhook_url: webhookUrl, status: 'active' });
 
     res.json({
       status: 'success',
@@ -157,7 +149,7 @@ router.post('/:id/sync', requirePermission('can_manage_bots'), async (req, res) 
       webhook_url: webhookUrl
     });
   } catch (err) {
-    res.status(400).json({ status: 'error', error: err.message });
+    res.status(400).json({ status: 'error', error: err.code === '23505' ? 'This Telegram bot is already linked.' : 'Could not complete the bot operation.' });
   }
 });
 
@@ -168,39 +160,39 @@ router.post('/:id/sync', requirePermission('can_manage_bots'), async (req, res) 
  */
 router.post('/:id/activate', requirePermission('can_manage_bots'), async (req, res) => {
   try {
-    const targetBot = await store.getBotById(req.params.id);
+    const targetBot = await store.getBotById(req.params.id, req.org.id);
     if (!targetBot || targetBot.org_id !== req.org.id) {
       return res.status(404).json({ error: 'Bot not found in your organization' });
     }
 
-    const orgBots = await store.getBotsByOrg(req.org.id);
+    const orgBots = await store.getBotsByOrg(req.org.id, { includeCredentials: true });
     const activeBots = orgBots.filter(b => b.status === 'active' && b.id !== targetBot.id);
 
     // If active bots meet max quota, pause the oldest active bot to make room
     if (activeBots.length >= req.org.max_bots) {
       const botToPause = activeBots[activeBots.length - 1];
-      await store.updateBot(botToPause.id, { status: 'paused' });
+      await store.updateBot(botToPause.id, req.org.id, { status: 'paused' });
       try {
-        await deleteBotWebhook(botToPause.bot_token);
+        await deleteBotWebhook(readBotToken(botToPause));
         console.log(`⏸️  [Quota Shift] Paused bot @${botToPause.bot_username} to activate @${targetBot.bot_username}`);
       } catch (e) {}
     }
 
     // Activate target bot and re-register webhook
-    await store.updateBot(targetBot.id, { status: 'active' });
+    const activated = await store.updateBot(targetBot.id, req.org.id, { status: 'active' });
     try {
       if (targetBot.webhook_url && targetBot.secret_token) {
-        await registerBotWebhook(targetBot.bot_token, targetBot.webhook_url, targetBot.secret_token);
+        await registerBotWebhook(readBotToken(targetBot), targetBot.webhook_url, targetBot.secret_token);
       }
     } catch (e) {}
 
     res.json({
       status: 'success',
       message: `Bot @${targetBot.bot_username} is now active!`,
-      data: targetBot
+      data: publicBot(activated)
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.code === '23505' ? 'This Telegram bot is already linked.' : 'Could not complete the bot operation.' });
   }
 });
 
@@ -210,23 +202,23 @@ router.post('/:id/activate', requirePermission('can_manage_bots'), async (req, r
  */
 router.post('/:id/pause', requirePermission('can_manage_bots'), async (req, res) => {
   try {
-    const targetBot = await store.getBotById(req.params.id);
+    const targetBot = await store.getBotById(req.params.id, req.org.id);
     if (!targetBot || targetBot.org_id !== req.org.id) {
       return res.status(404).json({ error: 'Bot not found in your organization' });
     }
 
-    await store.updateBot(targetBot.id, { status: 'paused' });
+    const paused = await store.updateBot(targetBot.id, req.org.id, { status: 'paused' });
     try {
-      await deleteBotWebhook(targetBot.bot_token);
+      await deleteBotWebhook(readBotToken(targetBot));
     } catch (e) {}
 
     res.json({
       status: 'success',
       message: `Bot @${targetBot.bot_username} has been paused`,
-      data: targetBot
+      data: publicBot(paused)
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.code === '23505' ? 'This Telegram bot is already linked.' : 'Could not complete the bot operation.' });
   }
 });
 

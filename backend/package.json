@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node --env-file=.env src/index.js",
     "dev": "node --env-file=.env --watch src/index.js",
-    "test": "node test-saas-flow.js",
+    "test": "node test-saas-flow.js && node --test test-tenant-webhook.js",
+    "db:deploy": "node src/db/deployMigrations.js",
+    "migrate:bot-tokens": "node src/db/migrateBotTokens.js",
     "register-bot": "node src/set-webhook.js",
     "set-webhook": "node src/set-webhook.js",
     "get-webhook": "node src/get-webhook.js",

@@ -1,3 +1,4 @@
+import { readBotToken } from '../services/botSecrets.js';
 import express from 'express';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { requireRole } from '../middleware/rbacMiddleware.js';
@@ -98,7 +99,7 @@ router.post('/upgrade', requireRole(['owner']), async (req, res) => {
     if (samePlan) {
       return res.json({ status: 'success', message: 'Billing period updated.', data: { org: updatedOrg } });
     }
-    const currentBots = await store.getBotsByOrg(currentOrg.id);
+    const currentBots = await store.getBotsByOrg(currentOrg.id, { includeCredentials: true });
 
     let botsPaused = 0;
     let botsReactivated = 0;
@@ -110,10 +111,10 @@ router.post('/upgrade', requireRole(['owner']), async (req, res) => {
         const b = currentBots[i];
         if (i < targetPlan.max_bots) {
           if (b.status !== 'active') {
-            await store.updateBot(b.id, { status: 'active' });
+            await store.updateBot(b.id, currentOrg.id, { status: 'active' });
             try {
               if (b.webhook_url && b.secret_token) {
-                await registerBotWebhook(b.bot_token, b.webhook_url, b.secret_token);
+                await registerBotWebhook(readBotToken(b), b.webhook_url, b.secret_token);
               }
             } catch (err) {
               console.warn(`Could not register webhook for bot @${b.bot_username}:`, err.message);
@@ -121,10 +122,10 @@ router.post('/upgrade', requireRole(['owner']), async (req, res) => {
           }
         } else {
           // Strictly pause excess bot and delete its Telegram webhook
-          await store.updateBot(b.id, { status: 'paused' });
+          await store.updateBot(b.id, currentOrg.id, { status: 'paused' });
           botsPaused++;
           try {
-            await deleteBotWebhook(b.bot_token);
+            await deleteBotWebhook(readBotToken(b));
             console.log(`⏸️  [Downgrade] Paused excess bot @${b.bot_username} and deleted Telegram webhook`);
           } catch (err) {
             console.warn(`Could not delete webhook for paused bot @${b.bot_username}:`, err.message);
@@ -138,12 +139,12 @@ router.post('/upgrade', requireRole(['owner']), async (req, res) => {
 
       for (const b of pausedBots) {
         if (availableSlots > 0) {
-          await store.updateBot(b.id, { status: 'active' });
+          await store.updateBot(b.id, currentOrg.id, { status: 'active' });
           availableSlots--;
           botsReactivated++;
           try {
             if (b.webhook_url && b.secret_token) {
-              await registerBotWebhook(b.bot_token, b.webhook_url, b.secret_token);
+              await registerBotWebhook(readBotToken(b), b.webhook_url, b.secret_token);
               console.log(`▶️  [Upgrade] Reactivated bot @${b.bot_username} and registered Telegram webhook`);
             }
           } catch (err) {

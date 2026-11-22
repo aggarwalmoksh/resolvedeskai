@@ -9,7 +9,7 @@ import React, {
   startTransition,
 } from 'react';
 import { PLAN_CATALOG } from '../../../shared/plans';
-import { api, createIdempotencyKey } from '../services/api';
+import { api, createIdempotencyKey, streamWorkspaceEvents } from '../services/api';
 import { useAuth } from './AuthContext';
 import { useToast } from '../ui/SileoToast';
 
@@ -50,13 +50,6 @@ function ScopedDataProvider({ children }) {
     (state, action) => {
       if (action.type === 'status') {
         return state.map((c) => (c.id === action.id ? { ...c, status: action.status } : c));
-      }
-      if (action.type === 'assign') {
-        return state.map((c) =>
-          c.id === action.id
-            ? { ...c, assigned_to: action.assigned_to, assignee: action.assignee }
-            : c
-        );
       }
       if (action.type === 'reply') {
         return state.map((c) =>
@@ -122,6 +115,9 @@ function ScopedDataProvider({ children }) {
       setComplaintError(complaintsData.status === 'rejected');
       if (complaintsData.status === 'fulfilled' && Array.isArray(complaintsData.value)) {
         setComplaints(complaintsData.value);
+      } else if ([401, 403].includes(complaintsData.reason?.status)) {
+        setComplaints([]);
+        setSelectedComplaintId(null);
       }
       if (botsData.status === 'fulfilled' && botsData.value?.bots) {
         setBots(botsData.value.bots);
@@ -155,8 +151,40 @@ function ScopedDataProvider({ children }) {
     };
     document.addEventListener('visibilitychange', onVisibility);
 
-    const interval = window.setInterval(() => refreshAll({ background: true }), 12000);
+    const controller = new AbortController();
+    let retry;
+    let refreshTimer;
+    let connected = false;
+    const scheduleRefresh = () => {
+      if (refreshTimer) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = undefined;
+        refreshAll({ background: true });
+      }, 250);
+    };
+    const connect = async () => {
+      let retryDelay = 100;
+      try {
+        await streamWorkspaceEvents(() => {
+          if (controller.signal.aborted) return;
+          connected = true;
+          scheduleRefresh();
+        }, controller.signal);
+      } catch {
+        retryDelay = 3000;
+      } finally {
+        connected = false;
+        if (!controller.signal.aborted) retry = window.setTimeout(connect, retryDelay);
+      }
+    };
+    void connect();
+    const interval = window.setInterval(() => {
+      if (!connected) scheduleRefresh();
+    }, 12000);
     return () => {
+      controller.abort();
+      window.clearTimeout(retry);
+      window.clearTimeout(refreshTimer);
       window.clearInterval(interval);
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('online', onOnline);
@@ -184,7 +212,7 @@ function ScopedDataProvider({ children }) {
 
   const visibleComplaints = ['owner', 'admin'].includes(user?.role)
     ? optimisticComplaints
-    : optimisticComplaints.filter(item => item.assigned_to === user?.id);
+    : optimisticComplaints.filter(item => item.assigned_to === user?.id || item.collaborator_ids?.includes(user?.id));
   const selectedComplaint = visibleComplaints.find((c) => c.id === selectedComplaintId) || null;
 
   const updateComplaintStatus = async (id, newStatus, userActor) => {
@@ -217,38 +245,31 @@ function ScopedDataProvider({ children }) {
   };
 
   const assignComplaint = async (id, assigneeId, assigneeName) => {
-    const previous = complaints;
-    startTransition(() => applyComplaint({
-      type: 'assign',
-      id,
-      assigned_to: assigneeId,
+    const { message, ...updated } = await api.assignComplaint(id, assigneeId);
+    setComplaints(previous => previous.map(item => item.id === id ? {
+      ...item,
+      ...updated,
       assignee: assigneeId ? { id: assigneeId, name: assigneeName } : null,
-    }));
-    try {
-      await api.assignComplaint(id, assigneeId);
-      setComplaints((prev) => prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              assigned_to: assigneeId,
-              assignee: assigneeId ? { id: assigneeId, name: assigneeName } : null,
-              messages: [...(c.messages || []), {
-                id: `audit-${Date.now()}`,
-                sender_type: 'system',
-                sender_name: 'System',
-                message_text: `Ticket assigned to ${assigneeName || 'Unassigned'}.`,
-                created_at: new Date().toISOString(),
-              }],
-            }
-          : c
-      ));
-      fetchComplaintDetails(id);
-      showToast(assigneeId ? `Assigned to ${assigneeName}` : 'Ticket unassigned');
-    } catch (e) {
-      setComplaints(previous);
-      showToast(e.message || 'Could not assign ticket', 'error');
-      throw e;
-    }
+      messages: message ? [...(item.messages || []), message] : item.messages,
+    } : item));
+    showToast(assigneeId ? `Assigned to ${assigneeName}` : 'Ticket unassigned');
+    refreshAll({ background: true });
+  };
+
+  const changeCollaborator = async (id, memberIds, add) => {
+    const updated = await api.changeCollaborator(id, memberIds, add);
+    setComplaints(previous => previous.map(item => item.id === id
+      ? { ...item, collaborator_ids: updated.collaborator_ids }
+      : item));
+    refreshAll({ background: true });
+  };
+
+  const addComplaintNote = async (id, text) => {
+    const note = await api.addComplaintNote(id, text, createIdempotencyKey());
+    setComplaints(previous => previous.map(item => item.id === id
+      ? { ...item, messages: [...(item.messages || []).filter(message => message.id !== note.id), note] }
+      : item));
+    refreshAll({ background: true });
   };
 
   const replyToComplaint = async (id, text, senderName = 'Support') => {
@@ -430,6 +451,8 @@ function ScopedDataProvider({ children }) {
         fetchComplaintDetails,
         updateComplaintStatus,
         assignComplaint,
+        changeCollaborator,
+        addComplaintNote,
         replyToComplaint,
         updateMemberPermissions,
         inviteMember,

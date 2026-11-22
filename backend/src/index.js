@@ -2,10 +2,6 @@ import express from 'express';
 import { clerkMiddleware } from '@clerk/express';
 import {
   PORT,
-  ECHO,
-  ENFORCE_SECRET_TOKEN,
-  BOT_TOKEN,
-  SECRET_TOKEN,
   PUBLIC_BASE_URL,
   SUPABASE_URL,
   CORS_ORIGINS,
@@ -20,6 +16,8 @@ import complaintRoutes from './routes/complaintRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
+import { telegramWorkerReady, wakeTelegramWorker } from './services/telegramWorker.js';
+import workspaceEvents from './routes/workspaceEvents.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 
 const app = express();
@@ -43,32 +41,16 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/ready', (req, res) => {
+  const ready = telegramWorkerReady();
+  res.set('Cache-Control', 'no-store');
+  res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready' });
+});
+
 app.use(clerkMiddleware({
   secretKey: CLERK_SECRET_KEY,
   publishableKey: CLERK_PUBLISHABLE_KEY
 }));
-
-const idempotencyCache = new Map();
-app.use((req, res, next) => {
-  const key = req.get('Idempotency-Key');
-  if (!key || req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
-    return next();
-  }
-  if (idempotencyCache.has(key)) {
-    const cached = idempotencyCache.get(key);
-    return res.status(cached.status).json(cached.body);
-  }
-  const originalJson = res.json.bind(res);
-  res.json = (body) => {
-    idempotencyCache.set(key, { status: res.statusCode || 200, body });
-    if (idempotencyCache.size > 500) {
-      const first = idempotencyCache.keys().next().value;
-      idempotencyCache.delete(first);
-    }
-    return originalJson(body);
-  };
-  next();
-});
 
 // Health check & API Discovery endpoint
 app.get('/', (req, res) => {
@@ -90,6 +72,7 @@ app.get('/', (req, res) => {
 });
 
 // API Routes
+app.use('/api/workspace-events', workspaceEvents);
 app.use('/api/auth', authRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/complaints', complaintRoutes);
@@ -123,13 +106,17 @@ const server = app.listen(PORT, async () => {
   if (PUBLIC_BASE_URL) {
     console.log(`🌐 Public Webhook URL     : ${PUBLIC_BASE_URL.replace(/\/+$/, '')}/telegram/webhook`);
   }
-  console.log(`⚡ Supabase Database       : ${SUPABASE_URL ? 'CONNECTED (' + SUPABASE_URL + ')' : 'NOT CONFIGURED'}`);
-  console.log(`🔒 Secret Token Verify    : ${ENFORCE_SECRET_TOKEN ? 'STRICT (401 on mismatch)' : 'PERMISSIVE'}`);
+  console.log(`⚡ Supabase Database       : ${SUPABASE_URL ? 'CONFIGURED (' + SUPABASE_URL + ')' : 'NOT CONFIGURED'}`);
   console.log(`💾 Persistence             : Supabase only (no local fallback)`);
   console.log(`=============================================================`);
 
-  console.log(`\nReady to receive Telegram messages!\n`);
+  console.log(`Readiness check: http://localhost:${PORT}/ready`);
 });
+
+const workerInterval = setInterval(wakeTelegramWorker, 2000);
+workerInterval.unref();
+server.on('listening', wakeTelegramWorker);
+server.on('close', () => clearInterval(workerInterval));
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

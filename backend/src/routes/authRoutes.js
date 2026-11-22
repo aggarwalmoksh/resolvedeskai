@@ -144,7 +144,7 @@ router.post('/complete-invitation', async (req, res, next) => {
 
 router.get('/me', authMiddleware, async (req, res, next) => {
   try {
-    const [bots, members, complaints] = await Promise.all([store.getBotsByOrg(req.org.id), store.getUsersByOrg(req.org.id), store.getComplaints(req.org.id, { assigned_to: complaintAssigneeScope(req.user) })]);
+    const [bots, members, complaints] = await Promise.all([store.getBotsByOrg(req.org.id), store.getUsersByOrg(req.org.id), store.getComplaints(req.org.id, { participant_id: complaintAssigneeScope(req.user) })]);
     res.json({ status: 'success', data: { user: req.user, org: { ...req.org, stats: { botsCount: bots.length, membersCount: members.length, complaintsCount: complaints.length } } } });
   } catch (error) { next(error); }
 });

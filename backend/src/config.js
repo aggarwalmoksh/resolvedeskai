@@ -26,7 +26,6 @@ export const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN?.trim();
 export const SECRET_TOKEN = process.env.SECRET_TOKEN?.replace(/^["']|["']$/g, '').trim();
 export const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL?.trim();
 export const ECHO = process.env.ECHO === '1' || process.env.ECHO === 'true';
-export const ENFORCE_SECRET_TOKEN = process.env.ENFORCE_SECRET_TOKEN === '1' || process.env.ENFORCE_SECRET_TOKEN === 'true';
 export const LOADED_ENV_PATH = envPath;
 export const SUPABASE_URL = process.env.SUPABASE_URL?.trim();
 export const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();

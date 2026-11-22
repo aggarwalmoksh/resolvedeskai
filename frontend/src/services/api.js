@@ -21,8 +21,7 @@ export function createIdempotencyKey() {
   return crypto.randomUUID();
 }
 
-async function request(path, options = {}) {
-  const { idempotencyKey, headers: extraHeaders, ...rest } = options;
+async function authToken() {
   let token = clerkSessionToken;
   if (tokenGetter) {
     try {
@@ -34,6 +33,43 @@ async function request(path, options = {}) {
     } catch {}
   }
 
+  return token;
+}
+
+export async function streamWorkspaceEvents(onEvent, signal) {
+  const token = await authToken();
+  const response = await fetch(`${API_BASE}/workspace-events`, {
+    headers: { Accept: 'text/event-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    signal,
+  });
+  if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
+    await response.body?.cancel();
+    throw new Error('Workspace events unavailable.');
+  }
+
+  let pending = '';
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      pending += value;
+      let boundary = pending.indexOf('\n\n');
+      while (boundary !== -1) {
+        const event = pending.slice(0, boundary);
+        pending = pending.slice(boundary + 2);
+        if (event === 'data: ready' || event === 'data: changed') onEvent(event === 'data: ready');
+        boundary = pending.indexOf('\n\n');
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function request(path, options = {}) {
+  const { idempotencyKey, headers: extraHeaders, ...rest } = options;
+  const token = await authToken();
   const response = await fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: {
@@ -47,6 +83,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const error = new Error(body.error || 'Request failed.');
     error.code = body.code;
+    error.status = response.status;
     throw error;
   }
   return body.data;
@@ -69,6 +106,8 @@ export const api = {
   getComplaint: (id) => request(`/complaints/${id}`),
   updateStatus: (id, status) => request(`/complaints/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   assignComplaint: (id, assigned_to) => request(`/complaints/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to }) }),
+  changeCollaborator: (id, member_ids, add) => request(`/complaints/${id}/collaborators`, { method: 'PATCH', body: JSON.stringify({ member_ids, add }) }),
+  addComplaintNote: (id, text, idempotencyKey) => request(`/complaints/${id}/notes`, { method: 'POST', body: JSON.stringify({ text }), idempotencyKey }),
   replyToComplaint: (id, text, idempotencyKey) =>
     request(`/complaints/${id}/reply`, { method: 'POST', body: JSON.stringify({ text }), idempotencyKey }),
   getTeam: () => request('/team'),

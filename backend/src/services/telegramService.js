@@ -10,7 +10,7 @@
 export async function verifyBotToken(botToken) {
   const url = `https://api.telegram.org/bot${botToken}/getMe`;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     const data = await res.json();
     if (!data.ok) {
       throw new Error(data.description || 'Invalid Telegram bot token');
@@ -22,14 +22,14 @@ export async function verifyBotToken(botToken) {
     };
   } catch (err) {
     // If running in sandbox or offline, allow simulated fallback for testing if token starts with 'test_'
-    if (botToken.startsWith('test_')) {
+    if (process.env.NODE_ENV !== 'production' && botToken.startsWith('test_')) {
       return {
         id: 123456789,
         username: 'test_demo_bot',
         title: 'Demo Test Bot'
       };
     }
-    throw new Error(`Telegram verification failed: ${err.message}`);
+    throw new Error('Telegram verification failed');
   }
 }
 
@@ -38,7 +38,7 @@ export async function registerBotWebhook(botToken, webhookUrl, secretToken) {
   try {
     const payload = {
       url: webhookUrl,
-      drop_pending_updates: true
+      drop_pending_updates: false
     };
     if (secretToken) {
       payload.secret_token = secretToken;
@@ -46,6 +46,7 @@ export async function registerBotWebhook(botToken, webhookUrl, secretToken) {
 
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
@@ -55,24 +56,24 @@ export async function registerBotWebhook(botToken, webhookUrl, secretToken) {
     }
     return data;
   } catch (err) {
-    if (botToken.startsWith('test_')) {
+    if (process.env.NODE_ENV !== 'production' && botToken.startsWith('test_')) {
       return { ok: true, description: 'Simulated webhook registration in test environment' };
     }
-    throw new Error(`Telegram setWebhook error: ${err.message}`);
+    throw new Error('Telegram setWebhook error');
   }
 }
 
 export async function deleteBotWebhook(botToken) {
   const url = `https://api.telegram.org/bot${botToken}/deleteWebhook`;
   try {
-    const res = await fetch(url, { method: 'POST' });
+    const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(8000) });
     const data = await res.json();
     return data;
   } catch (err) {
-    if (botToken.startsWith('test_')) {
+    if (process.env.NODE_ENV !== 'production' && botToken.startsWith('test_')) {
       return { ok: true, description: 'Simulated webhook deletion' };
     }
-    throw new Error(`Telegram deleteWebhook error: ${err.message}`);
+    throw new Error('Telegram deleteWebhook error');
   }
 }
 
@@ -89,6 +90,7 @@ export async function sendTelegramReply(botToken, chatId, text, replyToMessageId
 
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
@@ -98,9 +100,9 @@ export async function sendTelegramReply(botToken, chatId, text, replyToMessageId
     }
     return data;
   } catch (err) {
-    if (botToken.startsWith('test_')) {
+    if (process.env.NODE_ENV !== 'production' && botToken.startsWith('test_')) {
       return { ok: true, result: { message_id: Math.floor(Math.random() * 100000), text } };
     }
-    throw new Error(`Telegram sendMessage error: ${err.message}`);
+    throw new Error('Telegram sendMessage error');
   }
 }

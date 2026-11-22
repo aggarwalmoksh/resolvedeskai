@@ -496,3 +496,15 @@
 @media (max-width: 760px) {
   .rd-sidebar nav { grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); }
 }
+
+.rd-ticket-collaboration { display: grid; gap: 8px; padding: 10px 17px; border-bottom: 1px solid var(--rd-line); }
+.rd-ticket-collaboration > .rd-segments { justify-self: start; }
+.rd-ticket-collaborators { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--rd-muted); font-size: 12px; }
+.rd-ticket-collaborator { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 7px; background: var(--rd-raised); color: var(--rd-text); }
+.rd-ticket-collaborator button { display: grid; place-items: center; width: 28px; height: 28px; }
+.rd-workspace .rd-ticket-collaborator svg { width: 14px; height: 14px; }
+
+.rd-collaborator-picker { display: grid; gap: 8px; padding: 6px; min-width: 190px; }
+.rd-collaborator-options { display: grid; max-height: min(35dvh, 250px); overflow-y: auto; }
+.rd-collaborator-options label { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 5px 7px; cursor: pointer; }
+.rd-workspace .rd-collaborator-options input { min-height: 0; width: 16px; height: 16px; accent-color: var(--rd-green); }

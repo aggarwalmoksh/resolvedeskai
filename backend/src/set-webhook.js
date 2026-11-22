@@ -11,6 +11,11 @@ if (!BOT_TOKEN) {
   process.exit(1);
 }
 
+if (!/^[A-Za-z0-9_-]{1,256}$/.test(SECRET_TOKEN || '')) {
+  console.error('Set a valid SECRET_TOKEN before registering the default Telegram webhook.');
+  process.exit(1);
+}
+
 if (!baseUrl || baseUrl === 'https://your-tunnel.example.com') {
   console.error('❌ ERROR: PUBLIC_BASE_URL is not configured or still set to the placeholder.');
   console.error('👉 Please update PUBLIC_BASE_URL in your .env file with your public tunnel URL (e.g., https://xxxx.ngrok-free.app),');
@@ -24,7 +29,6 @@ const telegramApiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`;
 
 console.log(`Setting Telegram webhook...`);
 console.log(`- Webhook URL: ${webhookUrl}`);
-console.log(`- Secret Token: ${SECRET_TOKEN ? `"${SECRET_TOKEN}"` : '(none)'}`);
 if (dropPending) {
   console.log(`- Drop pending updates: YES`);
 }
