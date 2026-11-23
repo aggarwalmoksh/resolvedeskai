@@ -100,13 +100,15 @@ test('API scopes reads, strips bot credentials, and gates Telegram updates befor
   const update = {
     update_id: 0, message: { message_id: 1, from: { id: 10 }, chat: { id: 10 }, text: 'Please refund me' },
   };
-  const send = secret => fetch(`${endpoint}/telegram/webhook/${bot.id}`, {
-    method: 'POST', body: JSON.stringify(update), headers: {
+  const send = (secret, text = update.message.text) => fetch(`${endpoint}/telegram/webhook/${bot.id}`, {
+    method: 'POST', body: JSON.stringify({ ...update, message: { ...update.message, text } }), headers: {
       'content-type': 'application/json', ...(secret ? { 'x-telegram-bot-api-secret-token': secret } : {}),
     },
   });
   assert.equal((await send()).status, 401);
   assert.equal((await send('wrong')).status, 401);
+  assert.equal((await send(bot.secret_token, '/start referral')).status, 200);
+  assert.equal((await send(bot.secret_token, 'Hello!')).status, 200);
   assert.equal(queued.size, 0);
   failQueue = true;
   assert.equal((await send(bot.secret_token)).status, 503);

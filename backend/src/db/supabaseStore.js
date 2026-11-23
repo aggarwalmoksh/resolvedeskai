@@ -91,7 +91,7 @@ class SupabaseStore {
   }
 
   async processTelegramUpdate() {
-    const { data, error } = await db().rpc('process_telegram_update');
+    const { data, error } = await db().rpc('process_telegram_update').abortSignal(AbortSignal.timeout(10_000));
     checked(error, 'Could not process Telegram update');
     return data;
   }

@@ -14,7 +14,7 @@ function runSql(sql) {
   if (!['require', 'verify-ca', 'verify-full'].includes(sslMode)) {
     throw new Error('The migration connection must require TLS.');
   }
-  const result = spawnSync('psql', ['-X', '--no-password', '--set=ON_ERROR_STOP=1', '--single-transaction'], {
+  const result = spawnSync('psql', ['-X', '--no-password', '--set=ON_ERROR_STOP=1', '--single-transaction', '--file=-'], {
     input: sql,
     stdio: ['pipe', 'inherit', 'inherit'],
     env: {
@@ -37,6 +37,8 @@ try {
   fingerprintToken('');
   const hardening = readFileSync(new URL('./migrations/harden_tenant_and_telegram.sql', import.meta.url), 'utf8')
     .replace(/^begin;\s*/i, '').replace(/commit;\s*$/i, '');
+  const triage = readFileSync(new URL('./migrations/add_ai_triage.sql', import.meta.url), 'utf8');
+  const ticketTitles = readFileSync(new URL('./migrations/add_triage_ticket_titles.sql', import.meta.url), 'utf8');
   runSql(`
     select pg_advisory_xact_lock(781534620);
     create schema if not exists resolvedesk_migrations;
@@ -64,6 +66,20 @@ try {
     \\endif
     -- Earlier successful manual installs validated every tenant reference already.
     alter table public.complaints add column if not exists isolation_review_required boolean not null default false;
+    select not exists (
+      select 1 from resolvedesk_migrations.applied where version = 'ticket_triage_v1'
+    ) as triage_pending \\gset
+    \\if :triage_pending
+      ${triage}
+      insert into resolvedesk_migrations.applied values ('ticket_triage_v1');
+    \\endif
+    select not exists (
+      select 1 from resolvedesk_migrations.applied where version = 'triage_ticket_titles_v1'
+    ) as ticket_titles_pending \\gset
+    \\if :ticket_titles_pending
+      ${ticketTitles}
+      insert into resolvedesk_migrations.applied values ('triage_ticket_titles_v1');
+    \\endif
     notify pgrst, 'reload schema';
   `);
 

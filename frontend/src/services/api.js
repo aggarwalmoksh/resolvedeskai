@@ -104,6 +104,7 @@ export const api = {
   deleteBot: (id) => request(`/bots/${id}`, { method: 'DELETE' }),
   getComplaints: (filters = {}) => request(`/complaints?${new URLSearchParams(filters).toString()}`),
   getComplaint: (id) => request(`/complaints/${id}`),
+  updatePriority: (id, priority) => request(`/complaints/${id}/category`, { method: 'PATCH', body: JSON.stringify({ priority }) }),
   updateStatus: (id, status) => request(`/complaints/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   assignComplaint: (id, assigned_to) => request(`/complaints/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to }) }),
   changeCollaborator: (id, member_ids, add) => request(`/complaints/${id}/collaborators`, { method: 'PATCH', body: JSON.stringify({ member_ids, add }) }),

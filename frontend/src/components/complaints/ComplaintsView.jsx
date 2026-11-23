@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, Inbox, Search } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { CATEGORY_LABEL, STATUS_LABEL, timeAgo } from '../../lib/format';
+import { CATEGORY_LABEL, PRIORITY_LABEL, STATUS_LABEL, timeAgo } from '../../lib/format';
 import { ease, PageHeading, Segments } from '../../workspace/controls';
 
 import { Dropdown, DropdownSelect } from '../../workspace/Dropdown';
@@ -68,7 +68,8 @@ export function ComplaintsView({ onSelectComplaint: selectComplaint } = {}) {
             <button type="button" className="rd-complaint-row" onClick={() => onSelectComplaint(item.id)}>
               <span className="rd-initial" aria-hidden>{(item.customer?.name || 'Customer').slice(0, 1)}</span>
               <span className="rd-row-subject"><strong>{item.title || item.description || 'Telegram complaint'}</strong>
-                <small>{item.customer?.name || 'Telegram customer'}{item.category && ` · ${CATEGORY_LABEL[item.category] || item.category}`}</small></span>
+                <small>{item.customer?.name || 'Telegram customer'}{item.category && ` · ${CATEGORY_LABEL[item.category] || item.category}`}</small>
+                <span className="rd-priority" data-priority={item.priority}>{PRIORITY_LABEL[item.priority] || 'Unset'} priority</span></span>
               <span className="rd-row-assignee">{item.assignee?.name || 'Unassigned'}</span>
               <span className="rd-row-status" data-status={item.status}><i />{STATUS_LABEL[item.status] || item.status}</span>
               <time dateTime={item.updated_at || item.created_at}>{timeAgo(item.updated_at || item.created_at)}</time>

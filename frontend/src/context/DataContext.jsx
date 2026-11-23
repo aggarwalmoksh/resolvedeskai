@@ -244,6 +244,14 @@ function ScopedDataProvider({ children }) {
     }
   };
 
+  const updateComplaintPriority = async (id, priority) => {
+    const updated = await api.updatePriority(id, priority);
+    setComplaints(previous => previous.map(item => item.id === id
+      ? { ...item, priority: updated.priority, priority_manually_set: updated.priority_manually_set }
+      : item));
+    refreshAll({ background: true });
+  };
+
   const assignComplaint = async (id, assigneeId, assigneeName) => {
     const { message, ...updated } = await api.assignComplaint(id, assigneeId);
     setComplaints(previous => previous.map(item => item.id === id ? {
@@ -450,6 +458,7 @@ function ScopedDataProvider({ children }) {
         refreshAll,
         fetchComplaintDetails,
         updateComplaintStatus,
+        updateComplaintPriority,
         assignComplaint,
         changeCollaborator,
         addComplaintNote,

@@ -247,6 +247,7 @@ router.patch('/:id/category', async (req, res, next) => {
         return res.status(400).json({ error: `Invalid category. Must be one of: ${allowedCategories.join(', ')}` });
       }
       updates.category = category;
+      updates.category_manually_set = true;
     }
 
     if (priority) {
@@ -255,9 +256,20 @@ router.patch('/:id/category', async (req, res, next) => {
         return res.status(400).json({ error: `Invalid priority. Must be one of: ${allowedPriorities.join(', ')}` });
       }
       updates.priority = priority;
+      updates.priority_manually_set = true;
     }
 
-    const updated = await store.updateComplaint(req.params.id, updates, req.org.id, complaintAssigneeScope(req.user));
+    const participant = complaintAssigneeScope(req.user);
+    let previous;
+    if (priority && participant) {
+      previous = await store.getComplaintById(req.params.id, req.org.id, participant);
+      if (!previous) return res.status(404).json({ error: 'Complaint not found' });
+      if (previous.assigned_to !== req.user.id) {
+        return res.status(403).json({ error: 'Only the assignee or a workspace admin can change priority.' });
+      }
+    }
+
+    const updated = await store.updateComplaint(req.params.id, updates, req.org.id, participant, previous);
     if (!updated) {
       return res.status(404).json({ error: 'Complaint not found' });
     }

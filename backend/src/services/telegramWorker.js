@@ -2,10 +2,10 @@ import { store } from '../db/store.js';
 import { fingerprintToken, readBotToken } from './botSecrets.js';
 import { sendTelegramReply } from './telegramService.js';
 
-const schemaRetryMs = 30_000;
+const retryMs = 30_000;
 let running = false;
-let schemaRetryAt = 0;
-let waitingForSchema = false;
+let retryAt = 0;
+let waitingToRetry = false;
 let lastSuccessfulCall = 0;
 
 export function telegramWorkerReady() {
@@ -13,25 +13,25 @@ export function telegramWorkerReady() {
 }
 
 export function wakeTelegramWorker() {
-  if (running || Date.now() < schemaRetryAt) return;
+  if (running || Date.now() < retryAt) return;
   running = true;
   setImmediate(async () => {
     try {
       try {
         fingerprintToken('');
       } catch {
-        schemaRetryAt = Date.now() + schemaRetryMs;
-        if (!waitingForSchema) console.error('Telegram worker needs a valid BOT_TOKEN_ENCRYPTION_KEY.');
-        waitingForSchema = true;
+        retryAt = Date.now() + retryMs;
+        if (!waitingToRetry) console.error('Telegram worker needs a valid BOT_TOKEN_ENCRYPTION_KEY.');
+        waitingToRetry = true;
         return;
       }
       for (let index = 0; index < 50; index++) {
         const result = await store.processTelegramUpdate();
         lastSuccessfulCall = Date.now();
-        if (waitingForSchema) {
-          waitingForSchema = false;
-          schemaRetryAt = 0;
-          console.info('Telegram queue database function is available.');
+        if (waitingToRetry) {
+          waitingToRetry = false;
+          retryAt = 0;
+          console.info('Telegram queue processing recovered.');
         }
         if (!result) break;
         if (result.dead_letter) console.error('Telegram update exhausted retries.', result.update_id);
@@ -39,15 +39,22 @@ export function wakeTelegramWorker() {
       }
     } catch (error) {
       lastSuccessfulCall = 0;
-      if (error.code === 'PGRST202') {
-        schemaRetryAt = Date.now() + schemaRetryMs;
-        if (!waitingForSchema) {
-          console.error('Telegram queue paused (PGRST202). Apply backend/src/db/migrations/harden_tenant_and_telegram.sql in Supabase. If already applied, reload the PostgREST schema cache. The worker will retry in 30 seconds.');
+      retryAt = Date.now() + retryMs;
+      if (!waitingToRetry) {
+        const code = error.code;
+        let reason = 'Unexpected queue error';
+        if (code === 'PGRST202') {
+          reason = 'Supabase cannot find process_telegram_update. Check the migration and schema cache';
+        } else if (/TimeoutError|timed out|due to timeout/i.test(error.message)) {
+          reason = 'Supabase RPC request timed out';
+        } else if (/fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN/i.test(error.message)) {
+          reason = 'Could not reach the Supabase HTTPS API';
+        } else if (/^(?:PGRST[0-9]{3}|[0-9A-Z]{5})$/.test(code || '')) {
+          reason = `Supabase returned ${code}`;
         }
-        waitingForSchema = true;
-      } else {
-        console.error('Telegram queue processing failed.', error.code || error.name);
+        console.error(`Telegram queue paused. ${reason}. Retrying in 30 seconds.`);
       }
+      waitingToRetry = true;
     } finally {
       running = false;
     }

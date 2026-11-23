@@ -30,7 +30,12 @@ router.post(['/webhook/:botId', '/webhook'], async (req, res) => {
       return res.sendStatus(200);
     }
     const source = message.text || message.caption;
-    const text = typeof source === 'string' && source ? source : '[Non-text message]';
+    const text = typeof source === 'string' && source.trim() ? source.trim() : '[Non-text message]';
+    const command = message.entities?.some?.(entity => entity.type === 'bot_command' && entity.offset === 0);
+    const greetingOnly = /^(?:hi+|hey+|hello+|hii+|hlo+|hloo+|helo+|namaste|good (?:morning|afternoon|evening))[\s!.,?👋]*$/iu;
+    if (command || /^\/[a-z][\w]*(?:@[a-z\w]+)?(?:\s|$)/i.test(text) || greetingOnly.test(text)) {
+      return res.sendStatus(200);
+    }
     const field = value => typeof value === 'string' ? value.slice(0, 255) : null;
     await store.enqueueTelegramUpdate(bot, updateId, {
       user_id: message.from.id,

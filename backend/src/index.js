@@ -1,4 +1,5 @@
 import express from 'express';
+import { startTriageWorker } from './ai/triageWorker.js';
 import { clerkMiddleware } from '@clerk/express';
 import {
   PORT,
@@ -116,7 +117,12 @@ const server = app.listen(PORT, async () => {
 const workerInterval = setInterval(wakeTelegramWorker, 2000);
 workerInterval.unref();
 server.on('listening', wakeTelegramWorker);
-server.on('close', () => clearInterval(workerInterval));
+let stopTriageWorker = () => {};
+server.on('listening', () => { stopTriageWorker = startTriageWorker(); });
+server.on('close', () => {
+  clearInterval(workerInterval);
+  stopTriageWorker();
+});
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

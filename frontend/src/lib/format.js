@@ -15,7 +15,8 @@ export const CATEGORY_LABEL = {
 
 export const PRIORITY_LABEL = {
   low: 'Low',
-  normal: 'Normal',
+  medium: 'Medium',
+  normal: 'Medium',
   high: 'High',
   urgent: 'Urgent',
 };

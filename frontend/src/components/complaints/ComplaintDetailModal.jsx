@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, Send, X } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { CATEGORY_LABEL, STATUS_LABEL, timeAgo } from '../../lib/format';
+import { CATEGORY_LABEL, PRIORITY_LABEL, STATUS_LABEL, timeAgo } from '../../lib/format';
 import { Dropdown, DropdownSelect } from '../../workspace/Dropdown';
 import { Segments, WorkspaceDialog } from '../../workspace/controls';
 
@@ -11,7 +11,7 @@ export function ComplaintDetailSheet({ complaint, open, onClose }) {
 }
 
 function Conversation({ complaint, onClose }) {
-  const { team, updateComplaintStatus, assignComplaint, changeCollaborator, addComplaintNote, replyToComplaint, fetchComplaintDetails } = useData();
+  const { team, updateComplaintStatus, updateComplaintPriority, assignComplaint, changeCollaborator, addComplaintNote, replyToComplaint, fetchComplaintDetails } = useData();
   const { user, can } = useAuth();
   const [text, setText] = useState('');
   const [selectedCollaborators, setSelectedCollaborators] = useState([]);
@@ -29,6 +29,8 @@ function Conversation({ complaint, onClose }) {
   const selectedIds = availableCollaborators.filter(member => selectedCollaborators.includes(member.id)).map(member => member.id);
   const canManage = complaint.assigned_to === user?.id ||
     (['admin', 'owner'].includes(user?.role) && can('can_assign'));
+  const canEditPriority = complaint.assigned_to === user?.id || ['admin', 'owner'].includes(user?.role);
+  const priority = complaint.priority === 'normal' ? 'medium' : complaint.priority;
   const closed = ['closed', 'resolved'].includes(status);
 
   useEffect(() => { fetchComplaintDetails(id); }, [id, fetchComplaintDetails]);
@@ -55,12 +57,20 @@ function Conversation({ complaint, onClose }) {
   const showFirst = firstMessage && !messages.some(message => message.sender_type === 'customer' && (message.message_text || message.text) === firstMessage);
 
   return <WorkspaceDialog title={complaint.title || customer} drawer onClose={onClose}>
-    <div className="rd-conversation-meta"><div><strong>{customer}</strong><small>{complaint.ticket_number} · {CATEGORY_LABEL[complaint.category] || 'Other'}</small></div>
+    <div className="rd-conversation-meta"><div><strong>{customer}</strong><small>{complaint.ticket_number} · {CATEGORY_LABEL[complaint.category] || 'Other'}</small>
+      <span className="rd-priority" data-priority={complaint.priority}>{PRIORITY_LABEL[complaint.priority] || 'Unset'} priority</span></div>
       {can('can_update_status') ? <button className="rd-secondary" disabled={Boolean(busy)} onClick={() => perform('status', () => updateComplaintStatus(id, closed ? 'in_progress' : 'resolved', user))}>
         <Check aria-hidden /> {closed ? 'Reopen' : 'Resolve'}
       </button> : <span>{STATUS_LABEL[status]}</span>}
     </div>
-    <div className="rd-assignment"><span>{STATUS_LABEL[status]}</span>
+    <div className="rd-assignment">
+      <div className="rd-assignment-field">
+        <span>{STATUS_LABEL[status]}</span>
+        {canEditPriority && <DropdownSelect label="Change ticket priority" disabled={Boolean(busy)}
+          value={priority || ''}
+          options={['low', 'medium', 'high', 'urgent'].map(value => [value, `${PRIORITY_LABEL[value]} priority`])}
+          onChange={value => perform('priority', () => updateComplaintPriority(id, value))} />}
+      </div>
       {canManage ? <div className="rd-assignment-field">{can('can_assign') ? 'Assignee' : 'Forward ticket'}
         <DropdownSelect label="Forward or assign ticket" disabled={Boolean(busy)} value={complaint.assigned_to || ''}
           options={[...(can('can_assign') ? [['', 'Unassigned']] : []), ...staff.map(member => [member.id, member.name || member.email])]}
